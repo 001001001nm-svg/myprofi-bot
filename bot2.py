@@ -75,12 +75,12 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
-    # Модели с молниеносным откликом
+    # Исключительно точные названия валидных бесплатные моделей OpenRouter
     models_to_try = [
-        "google/gemini-2.0-flash-001",
-        "google/gemini-flash-1.5",
-        "qwen/qwen-2.5-7b-instruct:free",
-        "meta-llama/llama-3.2-3b-instruct:free"
+        "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "qwen/qwen-2.5-72b-instruct:free",
+        "mistralai/mistral-7b-instruct:free"
     ]
     
     for model in models_to_try:
@@ -90,22 +90,25 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 300,
+            "max_tokens": 400,
             "temperature": 0.5
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=8)
-            res_data = response.json()
-            
-            if 'choices' in res_data and len(res_data['choices']) > 0:
-                raw_content = res_data['choices'][0]['message']['content']
-                if raw_content:
-                    return clean_ai_response(raw_content)
-        except Exception:
+            response = requests.post(url, headers=headers, json=data, timeout=12)
+            if response.status_code == 200:
+                res_data = response.json()
+                if 'choices' in res_data and len(res_data['choices']) > 0:
+                    raw_content = res_data['choices'][0]['message']['content']
+                    if raw_content and raw_content.strip():
+                        return clean_ai_response(raw_content)
+            else:
+                print(f"Модель {model} вернула статус {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"Ошибка запроса к {model}: {e}")
             continue
 
-    return "⚠ Не удалось получить быстрый ответ. Пожалуйста, повторите запрос!"
+    return "⚠️ Сервер ИИ временно перегружен. Пожалуйста, попробуйте еще раз через пару секунд."
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
@@ -539,7 +542,7 @@ def handle_message(message):
     try:
         bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
     except Exception:
-        bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
+        bot.send_message(message.chat.id, ai_response)
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
