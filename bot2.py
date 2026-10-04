@@ -50,7 +50,7 @@ LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 E
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
 
 def clean_ai_response(text):
-    """Полностью удаляет звездочки, решетки и прочие спецсимволы разметки"""
+    """Удаляет спецсимволы разметки (markdown)"""
     lines = text.split('\n')
     filtered_lines = []
     for line in lines:
@@ -75,13 +75,13 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
-    # Список надежных бесплатных моделей
+    # Основная модель и запасы (включая самые быстрые варианты)
     models_to_try = [
         "google/gemini-2.0-flash-lite-001",
+        "openai/gpt-4o-mini",
         "google/gemini-2.0-flash-lite-preview-02-05:free",
         "meta-llama/llama-3.1-8b-instruct:free",
-        "qwen/qwen-2.5-72b-instruct:free",
-        "mistralai/mistral-7b-instruct:free"
+        "qwen/qwen-2.5-72b-instruct:free"
     ]
     
     for model in models_to_try:
@@ -91,12 +91,12 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 300,
+            "max_tokens": 400,
             "temperature": 0.4
         }
         
         try:
-            # Увеличен таймаут до 25 секунд для гарантированного ожидания ответа
+            # Увеличенный таймаут 25 секунд
             response = requests.post(url, headers=headers, json=data, timeout=25)
             if response.status_code == 200:
                 res_data = response.json()
@@ -110,7 +110,7 @@ def ask_ai(prompt, system_instruction):
             print(f"Ошибка запроса к {model}: {e}")
             continue
 
-    return "⚠️ Сервер ИИ временно занят. Пожалуйста, попробуйте еще раз через пару секунд."
+    return "⚠️ Сервер ИИ перегружен. Пожалуйста, попробуйте еще раз через пару секунд."
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
