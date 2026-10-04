@@ -60,7 +60,7 @@ def clean_ai_response(text):
     
     res = "\n".join(filtered_lines).strip()
     
-    # Удаляем все элементы markdown
+    # Удаляем элементы markdown
     for char in ["*", "#", "_", "`", "~"]:
         res = res.replace(char, "")
         
@@ -75,10 +75,10 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
-    # Самые быстрые и стабильные бесплатные модели
+    # Список надежных бесплатных моделей
     models_to_try = [
+        "google/gemini-2.0-flash-lite-001",
         "google/gemini-2.0-flash-lite-preview-02-05:free",
-        "google/gemini-2.0-flash-exp:free",
         "meta-llama/llama-3.1-8b-instruct:free",
         "qwen/qwen-2.5-72b-instruct:free",
         "mistralai/mistral-7b-instruct:free"
@@ -91,13 +91,13 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 250,   # Ограничение длины обеспечивает отдачу за 1.5-2 секунды
-            "temperature": 0.3   # Низкая температура ускоряет выбор токенов
+            "max_tokens": 300,
+            "temperature": 0.4
         }
         
         try:
-            # Таймаут 5 секунд: если модель не отвечает мгновенно — переходим к следующей
-            response = requests.post(url, headers=headers, json=data, timeout=5)
+            # Увеличен таймаут до 25 секунд для гарантированного ожидания ответа
+            response = requests.post(url, headers=headers, json=data, timeout=25)
             if response.status_code == 200:
                 res_data = response.json()
                 if 'choices' in res_data and len(res_data['choices']) > 0:
@@ -107,10 +107,10 @@ def ask_ai(prompt, system_instruction):
             else:
                 print(f"Модель {model} вернула статус {response.status_code}")
         except Exception as e:
-            print(f"Таймаут или ошибка {model}: {e}")
+            print(f"Ошибка запроса к {model}: {e}")
             continue
 
-    return "⚠️ ИИ перегружен. Нажмите кнопку еще раз через секунду!"
+    return "⚠️ Сервер ИИ временно занят. Пожалуйста, попробуйте еще раз через пару секунд."
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
@@ -513,30 +513,30 @@ def handle_message(message):
         f"CRITICAL: Answer ONLY in language: {selected_lang}.\n\n"
         f"Formatting rules:\n"
         f"1. Address student by name ({user_name}) briefly.\n"
-        f"2. Response MUST be extremely short and clear (max 3-4 bullet points or 1 short paragraph).\n"
+        f"2. Response MUST be clear and concise (3-5 bullet points or short paragraphs).\n"
         f"3. Use emojis (🎓, 🏛, 📜, 💡).\n"
         f"4. STRICTLY DO NOT USE MARKDOWN SYMBOLS LIKE *, #, _, `, ~ IN YOUR TEXT."
     )
 
     prompt_query = text
     if text in ["📋 Условия поступления", "📋 Талаптар жана сынактар", "📋 Admission Requirements", "📋 Başvuru Şartları"]:
-        prompt_query = f"List 3 main admission requirements for universities in {selected_country} briefly."
-    elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Üniversite Seçimi"]:
-        prompt_query = f"List top 4 universities in {selected_country} short."
+        prompt_query = f"List admission requirements for universities in {selected_country}."
+    elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Университет Seçimi"]:
+        prompt_query = f"List top universities in {selected_country}."
     elif text in ["📄 Необходимые документы", "📄 Керектүү документтер", "📄 Required Documents", "📄 Gerekli Belgeler"]:
-        prompt_query = f"List 4 required documents for universities in {selected_country} short."
+        prompt_query = f"List required documents for universities in {selected_country}."
     elif text in ["⚖️ Плюсы и Минусы", "⚖ Артыкчылыктар жана кемчиликтер", "⚖️ Pros and Cons", "⚖️ Artıları ve Eksileri"]:
-        prompt_query = f"Give 2 pros and 2 cons of studying in {selected_country} briefly."
+        prompt_query = f"Give pros and cons of studying in {selected_country}."
     elif text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
-        prompt_query = f"Give a short 3-step roadmap to study in {selected_country}."
+        prompt_query = f"Give a step-by-step roadmap to study in {selected_country}."
 
-    thinking_txt = "⚡ Быстрый ответ..."
+    thinking_txt = "⏳ Готовлю ответ..."
     if selected_lang == "🇰🇬 Кыргызча":
-        thinking_txt = "⚡ Жүктөлүүдө..."
+        thinking_txt = "⏳ Жүктөлүүдө..."
     elif selected_lang == "🇬🇧 English":
-        thinking_txt = "⚡ Processing..."
+        thinking_txt = "⏳ Generating response..."
     elif selected_lang == "🇹🇷 Türkçe":
-        thinking_txt = "⚡ Yanıt hazırlanıyor..."
+        thinking_txt = "⏳ Yanıt hazırlanıyor..."
 
     wait_msg = bot.send_message(message.chat.id, thinking_txt)
     ai_response = ask_ai(prompt_query, system_prompt)
