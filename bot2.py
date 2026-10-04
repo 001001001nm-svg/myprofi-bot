@@ -75,7 +75,6 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
-    # Использование только самой быстрой модели с ограниченной длиной ответа
     models_to_try = [
         "google/gemini-2.0-flash-lite-preview-02-05:free",
         "meta-llama/llama-3.3-70b-instruct:free"
@@ -88,11 +87,10 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 500  # Ограничение длины для максимальной скорости
+            "max_tokens": 500
         }
         
         try:
-            # Таймаут строго 5 секунд
             response = requests.post(url, headers=headers, json=data, timeout=5)
             res_data = response.json()
             
@@ -102,7 +100,7 @@ def ask_ai(prompt, system_instruction):
         except Exception:
             continue
 
-    return "⚠️ Сервер ИИ не успел ответить за 5 секунд. Пожалуйста, отправьте запрос повторно!"
+    return "⚠️️ Сервер ИИ не успел ответить за 5 секунд. Пожалуйста, отправьте запрос повторно!"
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
@@ -136,7 +134,7 @@ def get_main_keyboard(user_id, lang):
         markup.row("🔄 Start New Dialogue")
     elif lang == "🇹🇷 Türkçe":
         markup.row("📋 Başvuru Şartları", "🏛 Üniversite Seçimi")
-        markup.row("📄 Gerekli Belgeler", "⚖️ Artıları ve Eksileri")
+        markup.row("📄 Gerekli Belgeler", "⚖️️ Artıları ve Eksileri")
         markup.row("🗺 Yol Haritam", "📝 Not Defterim")
         markup.row("🌍 Ülke Değiştir", "🌐 Dili Değiştir")
         markup.row("🔄 Yeni Sohbet Başlat")
@@ -217,19 +215,19 @@ def start(message):
         all_users[user_id]["username"] = username_str
 
     user_states[user_id] = {
+        "lang": None,
         "name": None,
         "age": None,
-        "lang": None,
         "country": None,
         "notes": [],
-        "state": "WAITING_FOR_NAME"
+        "state": "WAITING_FOR_LANG"
     }
     
     msg = (
         "Салам! Мен Барсбекмин 🐆 / Здравствуйте! Я Барсбек 🐆\n\n"
-        "Как вас зовут? Напишите ваше имя / Атыңыз ким?"
+        "Тилди тандаңыз / Выберите язык / Select language / Dil seçin:"
     )
-    bot.send_message(message.chat.id, msg, reply_markup=types.ReplyKeyboardRemove())
+    bot.send_message(message.chat.id, msg, reply_markup=get_language_keyboard())
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("ban_"))
 def handle_ban_callback(call):
@@ -298,45 +296,55 @@ def handle_message(message):
             bot.send_message(message.chat.id, "❌ Участник не найден. Убедитесь, что он запускал бота.", reply_markup=get_owner_panel_keyboard())
         return
 
-    # Сбор Имени
-    if current_state == "WAITING_FOR_NAME":
-        user_data["name"] = text
-        user_data["state"] = "WAITING_FOR_AGE"
-        bot.send_message(message.chat.id, f"Приятно познакомиться, {text}! 🤝\nСколько вам лет? / Жашыңыз канчада?")
-        return
-
-    # Сбор Возраста
-    if current_state == "WAITING_FOR_AGE":
-        user_data["age"] = text
-        user_data["state"] = "WAITING_FOR_LANG"
-        bot.send_message(
-            message.chat.id, 
-            "Выбери язык / Тилди тандаңыз / Select language:", 
-            reply_markup=get_language_keyboard()
-        )
-        return
-
-    # Сбор Языка
+    # 1. Выбор Языка -> Спрашиваем Имя
     if current_state == "WAITING_FOR_LANG" or text in LANGUAGES:
         if text in LANGUAGES:
             user_data["lang"] = text
-            user_data["state"] = "WAITING_FOR_COUNTRY"
+            user_data["state"] = "WAITING_FOR_NAME"
             
-            if text == "🇰🇬 Кыргызча": msg_country = "Эми окуу үчүн өлкөнү тандаңыз:"
-            elif text == "🇬🇧 English": msg_country = "Now select the country for study:"
-            elif text == "🇹🇷 Türkçe": msg_country = "Şimdi eğitim almak istediğiniz ülkeyi seçin:"
-            else: msg_country = "Теперь выбери страну для обучения:"
+            if text == "🇰🇬 Кыргызча": msg_name = "Атыңыз ким? Жазып жибериңиз:"
+            elif text == "🇬🇧 English": msg_name = "What is your name? Please write:"
+            elif text == "🇹🇷 Türkçe": msg_name = "Adınız nedir? Lütfen yazın:"
+            else: msg_name = "Как вас зовут? Напишите ваше имя:"
 
-            bot.send_message(message.chat.id, msg_country, reply_markup=get_country_keyboard())
+            bot.send_message(message.chat.id, msg_name, reply_markup=types.ReplyKeyboardRemove())
             return
 
-    # Сбор Страны
+    # 2. Ввод Имени -> Спрашиваем Возраст
+    if current_state == "WAITING_FOR_NAME":
+        user_data["name"] = text
+        user_data["state"] = "WAITING_FOR_AGE"
+        lang = user_data.get("lang", "🇷🇺 Русский")
+        
+        if lang == "🇰🇬 Кыргызча": msg_age = f"Таанышканыма кубанычтамын, {text}! 🤝\nЖашыңыз канчада?"
+        elif lang == "🇬🇧 English": msg_age = f"Nice to meet you, {text}! 🤝\nHow old are you?"
+        elif lang == "🇹🇷 Türkçe": msg_age = f"Tanıştığıma memnun oldum, {text}! 🤝\nKaç yaşındasınız?"
+        else: msg_age = f"Приятно познакомиться, {text}! 🤝\nСколько вам лет?"
+
+        bot.send_message(message.chat.id, msg_age)
+        return
+
+    # 3. Ввод Возраста -> Спрашиваем Страну
+    if current_state == "WAITING_FOR_AGE":
+        user_data["age"] = text
+        user_data["state"] = "WAITING_FOR_COUNTRY"
+        lang = user_data.get("lang", "🇷🇺 Русский")
+        
+        if lang == "🇰🇬 Кыргызча": msg_country = "Эми окуу үчүн өлкөнү тандаңыз:"
+        elif lang == "🇬🇧 English": msg_country = "Now select the country for study:"
+        elif lang == "🇹🇷 Türkçe": msg_country = "Şimdi eğitim almak istediğiniz ülkeyi seçin:"
+        else: msg_country = "Теперь выберите страну для обучения:"
+
+        bot.send_message(message.chat.id, msg_country, reply_markup=get_country_keyboard())
+        return
+
+    # 4. Выбор Страны -> Главное меню
     if current_state == "WAITING_FOR_COUNTRY" or text in COUNTRIES:
         if text in COUNTRIES:
             user_data["country"] = text
             user_data["state"] = None
             lang = user_data.get("lang", "🇷🇺 Русский")
-            name = user_data.get("name", "друг")
+            name = user_data.get("name", "")
             
             if lang == "🇰🇬 Кыргызча": msg = f"Эң сонун, {name}! Тандалган өлкө: {text} 🎯\nКандай жардам бере алам?"
             elif lang == "🇬🇧 English": msg = f"Great, {name}! Selected country: {text} 🎯\nHow can I help you?"
@@ -408,11 +416,22 @@ def handle_message(message):
     if current_state == "WAITING_FOR_NOTE":
         user_data["notes"].append(text)
         user_data["state"] = None
-        bot.send_message(message.chat.id, "✅ Заметка сохранена!", reply_markup=get_notepad_keyboard(lang))
+        
+        if lang == "🇰🇬 Кыргызча": saved_msg = "✅ Жазуу сакталды!"
+        elif lang == "🇬🇧 English": saved_msg = "✅ Note saved!"
+        elif lang == "🇹🇷 Türkçe": saved_msg = "✅ Not kaydedildi!"
+        else: saved_msg = "✅ Заметка сохранена!"
+            
+        bot.send_message(message.chat.id, saved_msg, reply_markup=get_notepad_keyboard(lang))
         return
 
     if text in ["🔙 Главное меню", "🔙 Башкы меню", "🔙 Main Menu", "🔙 Ana Menü"]:
-        bot.send_message(message.chat.id, "🏡 Главное меню:", reply_markup=get_main_keyboard(user_id, lang))
+        if lang == "🇰🇬 Кыргызча": menu_msg = "🏡 Башкы меню:"
+        elif lang == "🇬🇧 English": menu_msg = "🏡 Main Menu:"
+        elif lang == "🇹🇷 Türkçe": menu_msg = "🏡 Ana Menü:"
+        else: menu_msg = "🏡 Главное меню:"
+            
+        bot.send_message(message.chat.id, menu_msg, reply_markup=get_main_keyboard(user_id, lang))
         return
 
     if text in ["🔄 Начать новый диалог", "🔄 Жаңы диалог баштоо", "🔄 Start New Dialogue", "🔄 Yeni Sohbet Başlat"]:
@@ -422,46 +441,68 @@ def handle_message(message):
     if text in ["📝 Мой блокнот", "📝 Менин дептерим", "📝 My Notepad", "📝 Not Defterim"]:
         notes = user_data.get("notes", [])
         if not notes:
-            msg = "📝 Ваш блокнот пока пуст."
+            if lang == "🇰🇬 Кыргызча": msg = "📝 Сиздин дептериңиз азырынча бош."
+            elif lang == "🇬🇧 English": msg = "📝 Your notepad is empty."
+            elif lang == "🇹🇷 Türkçe": msg = "📝 Not defteriniz henüz boş."
+            else: msg = "📝 Ваш блокнот пока пуст."
         else:
             notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)])
-            msg = f"📝 Заметки:\n\n{notes_str}"
+            if lang == "🇰🇬 Кыргызча": msg = f"📝 Жазуулар:\n\n{notes_str}"
+            elif lang == "🇬🇧 English": msg = f"📝 Notes:\n\n{notes_str}"
+            elif lang == "🇹🇷 Türkçe": msg = f"📝 Notlar:\n\n{notes_str}"
+            else: msg = f"📝 Заметки:\n\n{notes_str}"
+            
         bot.send_message(message.chat.id, msg, reply_markup=get_notepad_keyboard(lang))
         return
 
     if text in ["➕ Добавить заметку", "➕ Жаңы жазуу кошуу", "➕ Add Note", "➕ Not Ekle"]:
         user_data["state"] = "WAITING_FOR_NOTE"
-        bot.send_message(message.chat.id, "✍️ Введите текст заметки:")
+        if lang == "🇰🇬 Кыргызча": add_msg = "✍️ Жазуунун текстин киргизиңиз:"
+        elif lang == "🇬🇧 English": add_msg = "✍️ Enter note text:"
+        elif lang == "🇹🇷 Türkçe": add_msg = "✍️ Not metnini girin:"
+        else: add_msg = "✍️ Введите текст заметки:"
+            
+        bot.send_message(message.chat.id, add_msg)
         return
 
     if text in ["🗑 Очистить блокнот", "🗑 Дептерди тазалоо", "🗑 Clear Notepad", "🗑 Notları Temizle"]:
         user_data["notes"] = []
-        bot.send_message(message.chat.id, "🗑 Блокнот очищен!", reply_markup=get_notepad_keyboard(lang))
+        if lang == "🇰🇬 Кыргызча": clr_msg = "🗑 Дептер тазаланды!"
+        elif lang == "🇬🇧 English": clr_msg = "🗑 Notepad cleared!"
+        elif lang == "🇹🇷 Türkçe": clr_msg = "🗑 Not defteri temizlendi!"
+        else: clr_msg = "🗑 Блокнот очищен!"
+            
+        bot.send_message(message.chat.id, clr_msg, reply_markup=get_notepad_keyboard(lang))
         return
 
     if text in ["🌐 Сменить язык", "🌐 Тилди алмаштыруу", "🌐 Change Language", "🌐 Dili Değiştir"]:
         user_data["state"] = "WAITING_FOR_LANG"
-        bot.send_message(message.chat.id, "🌐 Выбери язык / Тилди тандаңыз:", reply_markup=get_language_keyboard())
+        bot.send_message(message.chat.id, "🌐 Тилди тандаңыз / Выберите язык:", reply_markup=get_language_keyboard())
         return
 
     if text in ["🌍 Сменить страну", "🌍 Өлкөнү алмаштыруу", "🌍 Change Country", "🌍 Ülke Değiştir"]:
         user_data["state"] = "WAITING_FOR_COUNTRY"
-        bot.send_message(message.chat.id, "🌍 Выбери страну / Өлкөнү тандаңыз:", reply_markup=get_country_keyboard())
+        if lang == "🇰🇬 Кыргызча": c_msg = "🌍 Өлкөнү тандаңыз:"
+        elif lang == "🇬🇧 English": c_msg = "🌍 Select country:"
+        elif lang == "🇹🇷 Türkçe": c_msg = "🌍 Ülke seçin:"
+        else: c_msg = "🌍 Выберите страну:"
+            
+        bot.send_message(message.chat.id, c_msg, reply_markup=get_country_keyboard())
         return
 
     # Запрос к ИИ
     selected_lang = user_data.get("lang", "🇷🇺 Русский")
     selected_country = user_data.get("country", "🇰🇬 Кыргызстан")
-    user_name = user_data.get("name", "друг")
-    user_age = user_data.get("age", "не указан")
+    user_name = user_data.get("name", "")
+    user_age = user_data.get("age", "")
 
     system_prompt = (
         f"You are Barsbek (Барсбек 🐆), an educational consultant AI.\n"
         f"User name: {user_name}, Age: {user_age}.\n"
         f"Selected study country: {selected_country}.\n"
-        f"CRITICAL: Answer ONLY in language: {selected_lang}.\n\n"
+        f"CRITICAL: You MUST answer EXCLUSIVELY and ONLY in language: {selected_lang}. Do not switch languages.\n\n"
         f"Formatting rules:\n"
-        f"1. Address student by name ({user_name}).\n"
+        f"1. Address student by name ({user_name}) if applicable.\n"
         f"2. Keep response concise and brief (up to 3-4 short paragraphs).\n"
         f"3. Use emojis (🎓, 🏛, 📜, 💡, 📌, ✨, 🚀).\n"
         f"4. STRICTLY DO NOT USE MARKDOWN SYMBOLS LIKE *, #, _, `, ~ IN YOUR TEXT."
