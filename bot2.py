@@ -91,7 +91,8 @@ def ask_ai(prompt, system_instruction):
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=5)
+            # Увеличен timeout до 15 секунд
+            response = requests.post(url, headers=headers, json=data, timeout=15)
             res_data = response.json()
             
             if 'choices' in res_data and len(res_data['choices']) > 0:
@@ -100,7 +101,7 @@ def ask_ai(prompt, system_instruction):
         except Exception:
             continue
 
-    return "⚠️️ Сервер ИИ не успел ответить за 5 секунд. Пожалуйста, отправьте запрос повторно!"
+    return "⚠ Сервер ИИ не успел ответить за 15 секунд. Пожалуйста, отправьте запрос повторно!"
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
@@ -134,7 +135,7 @@ def get_main_keyboard(user_id, lang):
         markup.row("🔄 Start New Dialogue")
     elif lang == "🇹🇷 Türkçe":
         markup.row("📋 Başvuru Şartları", "🏛 Üniversite Seçimi")
-        markup.row("📄 Gerekli Belgeler", "⚖️️ Artıları ve Eksileri")
+        markup.row("📄 Gerekli Belgeler", "⚖ Artıları ve Eksileri")
         markup.row("🗺 Yol Haritam", "📝 Not Defterim")
         markup.row("🌍 Ülke Değiştir", "🌐 Dili Değiştir")
         markup.row("🔄 Yeni Sohbet Başlat")
@@ -520,10 +521,13 @@ def handle_message(message):
     elif text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
         prompt_query = f"Create a step-by-step roadmap to apply for universities in {selected_country}."
 
-    thinking_txt = "⏳ Думаю..."
-    if selected_lang == "🇰🇬 Кыргызча": thinking_txt = "⏳ Ойлонуп жатам..."
-    elif selected_lang == "🇬🇧 English": thinking_txt = "⏳ Thinking..."
-    elif selected_lang == "🇹🇷 Türkçe": thinking_txt = "⏳ Düşünüyorum..."
+    thinking_txt = "⏳ Думаю, ответ будет по времени до 15 секунд..."
+    if selected_lang == "🇰🇬 Кыргызча":
+        thinking_txt = "⏳ Ойлонуп жатам, жооп 15 секундага чейин убакытты алышы мүмкүн..."
+    elif selected_lang == "🇬🇧 English":
+        thinking_txt = "⏳ Thinking, response may take up to 15 seconds..."
+    elif selected_lang == "🇹🇷 Türkçe":
+        thinking_txt = "⏳ Düşünüyorum, yanıt 15 saniyeye kadar sürebilir..."
 
     wait_msg = bot.send_message(message.chat.id, thinking_txt)
     ai_response = ask_ai(prompt_query, system_prompt)
