@@ -33,7 +33,6 @@ threading.Thread(target=run_web_server, daemon=True).start()
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
 
-# 👑 Ваш Telegram ID уже установлен!
 OWNER_ID = 8762115500
 
 if not TELEGRAM_TOKEN:
@@ -51,17 +50,20 @@ LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 E
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
 
 def clean_ai_response(text):
-    """Очищает текст от сломанных тегов и звездочек"""
+    """Полностью удаляет звездочки, решетки и прочие спецсимволы разметки"""
     lines = text.split('\n')
     filtered_lines = []
     for line in lines:
         if "user safety:" in line.lower():
             continue
-        line = line.replace("###", "").replace("##", "").replace("#", "")
         filtered_lines.append(line)
     
     res = "\n".join(filtered_lines).strip()
-    res = res.replace("** ", "**").replace(" **", "**")
+    
+    # Удаляем все элементы markdown
+    for char in ["*", "#", "_", "`", "~"]:
+        res = res.replace(char, "")
+        
     return res
 
 def ask_ai(prompt, system_instruction):
@@ -73,36 +75,34 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
+    # Использование только самой быстрой модели с ограниченной длиной ответа
     models_to_try = [
-        "openrouter/free",
-        "google/gemma-2-9b-it:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "qwen/qwen-2.5-72b-instruct:free"
+        "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "meta-llama/llama-3.3-70b-instruct:free"
     ]
     
-    last_error = None
     for model in models_to_try:
         data = {
             "model": model,
             "messages": [
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            "max_tokens": 500  # Ограничение длины для максимальной скорости
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=30)
+            # Таймаут строго 5 секунд
+            response = requests.post(url, headers=headers, json=data, timeout=5)
             res_data = response.json()
             
             if 'choices' in res_data and len(res_data['choices']) > 0:
                 raw_content = res_data['choices'][0]['message']['content']
                 return clean_ai_response(raw_content)
-            else:
-                last_error = res_data.get('error', {}).get('message', 'Неизвестная ошибка')
-        except Exception as e:
-            last_error = str(e)
+        except Exception:
+            continue
 
-    return f"⚠️ Ошибка ИИ: {last_error}"
+    return "⚠️ Сервер ИИ не успел ответить за 5 секунд. Пожалуйста, отправьте запрос повторно!"
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
@@ -252,8 +252,19 @@ def handle_message(message):
         return
 
     today_str = datetime.date.today().isoformat()
+    username = message.from_user.username
+    username_str = f"@{username}" if username else "Без username"
+    
     if user_id in all_users:
         all_users[user_id]["last_active"] = today_str
+        all_users[user_id]["username"] = username_str
+    else:
+        all_users[user_id] = {
+            "username": username_str,
+            "first_name": message.from_user.first_name or "Пользователь",
+            "join_date": today_str,
+            "last_active": today_str
+        }
 
     if user_id not in user_states:
         start(message)
@@ -278,7 +289,7 @@ def handle_message(message):
 
         if found_id:
             admins.add(found_id)
-            bot.send_message(message.chat.id, f"✅ Пользователь {target} (ID: {found_id}) назначен администратором!", reply_markup=get_owner_panel_keyboard())
+            bot.send_message(message.chat.id, f"✅ Пользователь @{target} назначен администратором!", reply_markup=get_owner_panel_keyboard())
             try:
                 bot.send_message(found_id, "🎉 Вы были назначены администратором бота! Теперь вам доступна Панель Админа.")
             except:
@@ -341,11 +352,11 @@ def handle_message(message):
     # КНОПКИ УПРАВЛЕНИЯ
     # ==========================================
     if text == "🛠 Панель Админа" and (user_id == OWNER_ID or user_id in admins):
-        bot.send_message(message.chat.id, "🛠 **Панель Администратора**", reply_markup=get_admin_panel_keyboard())
+        bot.send_message(message.chat.id, "🛠 Панель Администратора", reply_markup=get_admin_panel_keyboard())
         return
 
     if text == "👑 Панель Владельца" and user_id == OWNER_ID:
-        bot.send_message(message.chat.id, "👑 **Панель Владельца**", reply_markup=get_owner_panel_keyboard())
+        bot.send_message(message.chat.id, "👑 Панель Владельца", reply_markup=get_owner_panel_keyboard())
         return
 
     if text == "🛑 Остановить бота" and user_id == OWNER_ID:
@@ -358,18 +369,22 @@ def handle_message(message):
         return
 
     if text == "📜 Список админов" and user_id == OWNER_ID:
-        admin_list = [f"👑 Владелец: {OWNER_ID}"]
+        owner_info = all_users.get(OWNER_ID, {})
+        owner_username = owner_info.get("username", "Неизвестно")
+        admin_list = [f"👑 Владелец: {owner_username} (ID: {OWNER_ID})"]
+        
         for aid in admins:
             info = all_users.get(aid, {})
-            u_str = info.get("username", f"ID: {aid}")
+            u_str = info.get("username", "Без username")
             admin_list.append(f"🛠 Админ: {u_str} (ID: {aid})")
+            
         bot.send_message(message.chat.id, "\n".join(admin_list))
         return
 
     if text == "📊 Участников за сегодня" and (user_id == OWNER_ID or user_id in admins):
         today_str = datetime.date.today().isoformat()
         count = sum(1 for u in all_users.values() if u.get("last_active") == today_str)
-        bot.send_message(message.chat.id, f"📊 Активных участников за сегодня ({today_str}): **{count}**")
+        bot.send_message(message.chat.id, f"📊 Активных участников за сегодня ({today_str}): {count}")
         return
 
     if text == "👥 Все участники" and (user_id == OWNER_ID or user_id in admins):
@@ -380,7 +395,7 @@ def handle_message(message):
         bot.send_message(message.chat.id, f"👥 Всего зарегистрировано участников: {len(all_users)}")
         for uid, info in all_users.items():
             is_banned = " [ЗАБЛОКИРОВАН]" if uid in banned_users else ""
-            msg_text = f"👤 {info['first_name']} | {info['username']}\nID: {uid}{is_banned}"
+            msg_text = f"👤 {info['first_name']} | Username: {info['username']}\nID: {uid}{is_banned}"
             
             inline_kb = types.InlineKeyboardMarkup()
             if uid not in banned_users and uid != OWNER_ID:
@@ -447,18 +462,19 @@ def handle_message(message):
         f"CRITICAL: Answer ONLY in language: {selected_lang}.\n\n"
         f"Formatting rules:\n"
         f"1. Address student by name ({user_name}).\n"
-        f"2. Use emojis (🎓, 🏛, 📜, 💡, 📌, ✨, 🚀).\n"
-        f"3. Do NOT use markdown symbols like ### or ** surrounding text incorrectly."
+        f"2. Keep response concise and brief (up to 3-4 short paragraphs).\n"
+        f"3. Use emojis (🎓, 🏛, 📜, 💡, 📌, ✨, 🚀).\n"
+        f"4. STRICTLY DO NOT USE MARKDOWN SYMBOLS LIKE *, #, _, `, ~ IN YOUR TEXT."
     )
 
     prompt_query = text
     if text in ["📋 Условия поступления", "📋 Талаптар жана сынактар", "📋 Admission Requirements", "📋 Başvuru Şartları"]:
-        prompt_query = f"Explain admission requirements for universities in {selected_country}."
+        prompt_query = f"Explain admission requirements for universities in {selected_country} briefly."
     elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Üniversite Seçimi"]:
         prompt_query = f"List top 5 universities in {selected_country}."
     elif text in ["📄 Необходимые документы", "📄 Керектүү документтер", "📄 Required Documents", "📄 Gerekli Belgeler"]:
         prompt_query = f"List required documents for universities in {selected_country}."
-    elif text in ["⚖️ Плюсы и Минусы", "⚖️️ Артыкчылыктар жана кемчиликтер", "⚖️ Pros and Cons", "⚖️ Artıları ve Eksileri"]:
+    elif text in ["⚖️ Плюсы и Минусы", "⚖ Артыкчылыктар жана кемчиликтер", "⚖️ Pros and Cons", "⚖️ Artıları ve Eksileri"]:
         prompt_query = f"What are pros and cons of studying in {selected_country}?"
     elif text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
         prompt_query = f"Create a step-by-step roadmap to apply for universities in {selected_country}."
