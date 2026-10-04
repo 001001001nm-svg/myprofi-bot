@@ -32,6 +32,8 @@ threading.Thread(target=run_web_server, daemon=True).start()
 # ==========================================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
+# Используем переменные окружения или твой Access Key напрямую
+UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "odaMYOHO8tsFHyGe_Q8-0EZtab_NohgvOYRBEvtIkRE")
 
 OWNER_ID = 8762115500
 
@@ -48,6 +50,22 @@ all_users = {}               # user_id -> info
 
 LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 English", "🇹🇷 Türkçe"]
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
+
+def get_topic_image(query):
+    """Ищет качественное тематическое фото через Unsplash API"""
+    if not UNSPLASH_KEY:
+        return None
+
+    url = f"https://api.unsplash.com/search/photos?page=1&query={query}&per_page=1&client_id={UNSPLASH_KEY}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('results') and len(data['results']) > 0:
+                return data['results'][0]['urls']['regular']
+    except Exception as e:
+        print(f"Ошибка при запросе фото к Unsplash: {e}")
+    return None
 
 def clean_ai_response(text):
     """Очищает текст и форматирует его для легкого чтения"""
@@ -195,7 +213,6 @@ def get_notepad_keyboard(lang):
         markup.row("🔙 Главное меню")
     return markup
 
-# Интерактивная клавиатура для «Моего пути» (чтобы не перегружать длинным текстом)
 def get_roadmap_inline_keyboard(lang):
     markup = types.InlineKeyboardMarkup()
     if lang == "🇰🇬 Кыргызча":
@@ -278,6 +295,14 @@ def handle_roadmap_steps(call):
     sys_prompt = f"You are Barsbek consultant. Language: {selected_lang}. Be short, concise, use emojis. NO MARKDOWN SYMBOLS like *, #, _."
     ai_text = ask_ai(steps_prompts[step], sys_prompt)
     
+    # Ищем фото для шага
+    image_url = get_topic_image(f"university {selected_country}")
+    if image_url:
+        try:
+            bot.send_photo(call.message.chat.id, photo=image_url, caption=ai_text)
+            return
+        except Exception:
+            pass
     bot.send_message(call.message.chat.id, ai_text)
 
 @bot.message_handler(func=lambda message: True)
@@ -477,7 +502,7 @@ def handle_message(message):
         bot.send_message(message.chat.id, "🌍 Выберите страну:", reply_markup=get_country_keyboard())
         return
 
-    # СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ КНОПКИ «МОЙ ПУТЬ» (Разбиение на интерактивные шаги)
+    # Дорожная карта (Мой путь)
     if text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
         c_country = user_data.get("country", "Канада")
         roadmap_intro = (
@@ -493,7 +518,7 @@ def handle_message(message):
     user_name = user_data.get("name", "")
     user_age = user_data.get("age", "")
 
-    # СТРОГИЙ ПРОМПТ НА КРАТКОСТЬ И УДОБСТВО РЕДАКТИРОВАНИЯ
+    # Промпт для ИИ
     system_prompt = (
         f"You are Barsbek (Барсбек 🐆), an expert education consultant.\n"
         f"User name: {user_name}, Age: {user_age}.\n"
@@ -508,14 +533,20 @@ def handle_message(message):
     )
 
     prompt_query = text
+    photo_keyword = f"university {selected_country}"
+
     if text in ["📋 Условия поступления", "📋 Талаптар жана сынактар", "📋 Admission Requirements", "📋 Başvuru Şartları"]:
         prompt_query = f"Give top 3 key admission requirements for universities in {selected_country}."
+        photo_keyword = f"study {selected_country}"
     elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Университет Seçimi"]:
         prompt_query = f"List top 4 best universities in {selected_country} with brief notes."
+        photo_keyword = f"university campus {selected_country}"
     elif text in ["📄 Необходимые документы", "📄 Керектүү документтер", "📄 Required Documents", "📄 Gerekli Belgeler"]:
         prompt_query = f"List 4 essential documents needed for applying to {selected_country}."
+        photo_keyword = "documents passport study"
     elif text in ["⚖️ Плюсы и Минусы", "⚖ Артыкчылыктар жана кемчиликтер", "⚖️ Pros and Cons", "⚖️ Artıları ve Eksileri"]:
         prompt_query = f"List 2 main pros and 2 main cons of studying in {selected_country}."
+        photo_keyword = f"students {selected_country}"
 
     thinking_txt = "⏳ Готовлю ответ..."
     if selected_lang == "🇰🇬 Кыргызча": thinking_txt = "⏳ Жүктөлүүдө..."
@@ -523,11 +554,25 @@ def handle_message(message):
     elif selected_lang == "🇹🇷 Türkçe": thinking_txt = "⏳ Yanıt hazırlanıyor..."
 
     wait_msg = bot.send_message(message.chat.id, thinking_txt)
+    
+    # Получаем параллельно картинку и ответ ИИ
+    image_url = get_topic_image(photo_keyword)
     ai_response = ask_ai(prompt_query, system_prompt)
     
+    # Удаляем сообщение ожидания
     try:
-        bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
+        bot.delete_message(message.chat.id, wait_msg.message_id)
     except Exception:
+        pass
+
+    # Отправляем ответ: с фото подписью или текстовым сообщением
+    if image_url:
+        try:
+            bot.send_photo(message.chat.id, photo=image_url, caption=ai_response)
+        except Exception as e:
+            print(f"Ошибка отправки фото: {e}")
+            bot.send_message(message.chat.id, ai_response)
+    else:
         bot.send_message(message.chat.id, ai_response)
 
 if __name__ == "__main__":
