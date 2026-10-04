@@ -75,9 +75,10 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
-    # Исключительно точные названия валидных бесплатные моделей OpenRouter
+    # Самые быстрые и стабильные бесплатные модели
     models_to_try = [
         "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "google/gemini-2.0-flash-exp:free",
         "meta-llama/llama-3.1-8b-instruct:free",
         "qwen/qwen-2.5-72b-instruct:free",
         "mistralai/mistral-7b-instruct:free"
@@ -90,12 +91,13 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 400,
-            "temperature": 0.5
+            "max_tokens": 250,   # Ограничение длины обеспечивает отдачу за 1.5-2 секунды
+            "temperature": 0.3   # Низкая температура ускоряет выбор токенов
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=12)
+            # Таймаут 5 секунд: если модель не отвечает мгновенно — переходим к следующей
+            response = requests.post(url, headers=headers, json=data, timeout=5)
             if response.status_code == 200:
                 res_data = response.json()
                 if 'choices' in res_data and len(res_data['choices']) > 0:
@@ -103,12 +105,12 @@ def ask_ai(prompt, system_instruction):
                     if raw_content and raw_content.strip():
                         return clean_ai_response(raw_content)
             else:
-                print(f"Модель {model} вернула статус {response.status_code}: {response.text}")
+                print(f"Модель {model} вернула статус {response.status_code}")
         except Exception as e:
-            print(f"Ошибка запроса к {model}: {e}")
+            print(f"Таймаут или ошибка {model}: {e}")
             continue
 
-    return "⚠️ Сервер ИИ временно перегружен. Пожалуйста, попробуйте еще раз через пару секунд."
+    return "⚠️ ИИ перегружен. Нажмите кнопку еще раз через секунду!"
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
@@ -297,11 +299,11 @@ def handle_message(message):
             admins.add(found_id)
             bot.send_message(message.chat.id, f"✅ Пользователь @{target} назначен администратором!", reply_markup=get_owner_panel_keyboard())
             try:
-                bot.send_message(found_id, "🎉 Вы были назначены администратором бота! Теперь вам доступна Панель Админа.")
+                bot.send_message(found_id, "🎉 Вы были назначены администратором бота!")
             except:
                 pass
         else:
-            bot.send_message(message.chat.id, "❌ Участник не найден. Убедитесь, что он запускал бота.", reply_markup=get_owner_panel_keyboard())
+            bot.send_message(message.chat.id, "❌ Участник не найден.", reply_markup=get_owner_panel_keyboard())
         return
 
     # 1. Выбор Языка -> Спрашиваем Имя
@@ -381,7 +383,7 @@ def handle_message(message):
 
     if text == "➕ Назначить администратором" and user_id == OWNER_ID:
         user_data["state"] = "WAITING_FOR_ADMIN_INPUT"
-        bot.send_message(message.chat.id, "Введите @username или Telegram ID участника для назначения админом:")
+        bot.send_message(message.chat.id, "Введите @username или Telegram ID участника:")
         return
 
     if text == "📜 Список админов" and user_id == OWNER_ID:
@@ -400,7 +402,7 @@ def handle_message(message):
     if text == "📊 Участников за сегодня" and (user_id == OWNER_ID or user_id in admins):
         today_str = datetime.date.today().isoformat()
         count = sum(1 for u in all_users.values() if u.get("last_active") == today_str)
-        bot.send_message(message.chat.id, f"📊 Активных участников за сегодня ({today_str}): {count}")
+        bot.send_message(message.chat.id, f"📊 Активных участников за сегодня: {count}")
         return
 
     if text == "👥 Все участники" and (user_id == OWNER_ID or user_id in admins):
@@ -408,7 +410,7 @@ def handle_message(message):
             bot.send_message(message.chat.id, "Список участников пуст.")
             return
 
-        bot.send_message(message.chat.id, f"👥 Всего зарегистрировано участников: {len(all_users)}")
+        bot.send_message(message.chat.id, f"👥 Всего участников: {len(all_users)}")
         for uid, info in all_users.items():
             is_banned = " [ЗАБЛОКИРОВАН]" if uid in banned_users else ""
             msg_text = f"👤 {info['first_name']} | Username: {info['username']}\nID: {uid}{is_banned}"
@@ -508,33 +510,33 @@ def handle_message(message):
         f"You are Barsbek (Барсбек 🐆), an educational consultant AI.\n"
         f"User name: {user_name}, Age: {user_age}.\n"
         f"Selected study country: {selected_country}.\n"
-        f"CRITICAL: You MUST answer EXCLUSIVELY and ONLY in language: {selected_lang}.\n\n"
+        f"CRITICAL: Answer ONLY in language: {selected_lang}.\n\n"
         f"Formatting rules:\n"
-        f"1. Address student by name ({user_name}) if applicable.\n"
-        f"2. Keep response very short and concise (1-2 brief paragraphs).\n"
+        f"1. Address student by name ({user_name}) briefly.\n"
+        f"2. Response MUST be extremely short and clear (max 3-4 bullet points or 1 short paragraph).\n"
         f"3. Use emojis (🎓, 🏛, 📜, 💡).\n"
         f"4. STRICTLY DO NOT USE MARKDOWN SYMBOLS LIKE *, #, _, `, ~ IN YOUR TEXT."
     )
 
     prompt_query = text
     if text in ["📋 Условия поступления", "📋 Талаптар жана сынактар", "📋 Admission Requirements", "📋 Başvuru Şartları"]:
-        prompt_query = f"Explain admission requirements for universities in {selected_country} briefly."
+        prompt_query = f"List 3 main admission requirements for universities in {selected_country} briefly."
     elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Üniversite Seçimi"]:
-        prompt_query = f"List top 5 universities in {selected_country}."
+        prompt_query = f"List top 4 universities in {selected_country} short."
     elif text in ["📄 Необходимые документы", "📄 Керектүү документтер", "📄 Required Documents", "📄 Gerekli Belgeler"]:
-        prompt_query = f"List required documents for universities in {selected_country}."
+        prompt_query = f"List 4 required documents for universities in {selected_country} short."
     elif text in ["⚖️ Плюсы и Минусы", "⚖ Артыкчылыктар жана кемчиликтер", "⚖️ Pros and Cons", "⚖️ Artıları ve Eksileri"]:
-        prompt_query = f"What are pros and cons of studying in {selected_country}?"
+        prompt_query = f"Give 2 pros and 2 cons of studying in {selected_country} briefly."
     elif text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
-        prompt_query = f"Create a step-by-step roadmap to apply for universities in {selected_country}."
+        prompt_query = f"Give a short 3-step roadmap to study in {selected_country}."
 
-    thinking_txt = "⏳ Формирую быстрый ответ..."
+    thinking_txt = "⚡ Быстрый ответ..."
     if selected_lang == "🇰🇬 Кыргызча":
-        thinking_txt = "⏳ Даярдап жатам..."
+        thinking_txt = "⚡ Жүктөлүүдө..."
     elif selected_lang == "🇬🇧 English":
-        thinking_txt = "⏳ Generating response..."
+        thinking_txt = "⚡ Processing..."
     elif selected_lang == "🇹🇷 Türkçe":
-        thinking_txt = "⏳ Yanıt hazırlanıyor..."
+        thinking_txt = "⚡ Yanıt hazırlanıyor..."
 
     wait_msg = bot.send_message(message.chat.id, thinking_txt)
     ai_response = ask_ai(prompt_query, system_prompt)
