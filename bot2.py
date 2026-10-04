@@ -5,7 +5,9 @@ import telebot
 from telebot import types
 import requests
 
-# 1. Встроенный HTTP сервер для Render
+# ==========================================
+# 1. МИНИ ВЕБ-СЕРВЕР ДЛЯ РЕНДЕРА (БЕЗ FLASK)
+# ==========================================
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -22,9 +24,12 @@ def run_web_server():
     print(f"Web server running on port {port}")
     server.serve_forever()
 
+# Запускаем веб-сервер в фоновом потоке
 threading.Thread(target=run_web_server, daemon=True).start()
 
-# 2. Переменные окружения и инициализация
+# ==========================================
+# 2. ИНИЦИАЛИЗАЦИЯ И ИИ OPENROUTER
+# ==========================================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
 
@@ -38,7 +43,6 @@ user_states = {}
 LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 English", "🇹🇷 Türkçe"]
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
 
-# 3. Запрос к ИИ OpenRouter
 def ask_ai(prompt, system_instruction):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -49,7 +53,7 @@ def ask_ai(prompt, system_instruction):
     }
     
     data = {
-        "model": "openrouter/free",
+        "model": "openrouter/free",  # Автоматический выбор доступной бесплатной модели
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
@@ -65,12 +69,14 @@ def ask_ai(prompt, system_instruction):
         else:
             print(f"OpenRouter Raw Error: {res_data}")
             err_msg = res_data.get('error', {}).get('message', 'Неизвестная ошибка')
-            return f"Ошибка ИИ: {err_msg}"
+            return f"⚠️ Ошибка ИИ: {err_msg}"
     except Exception as e:
         print(f"Request exception: {e}")
-        return "Ошибка соединения с ИИ. Попробуй позже."
+        return "❌ Ошибка соединения с ИИ. Попробуй позже."
 
-# 4. Клавиатуры
+# ==========================================
+# 3. КЛАВИАТУРЫ
+# ==========================================
 def get_language_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     markup.row("🇷🇺 Русский", "🇰🇬 Кыргызча")
@@ -128,7 +134,9 @@ def get_notepad_keyboard(lang):
         markup.row("🔙 Главное меню")
     return markup
 
-# 5. Логика бота
+# ==========================================
+# 4. ОБРАБОТЧИКИ СООБЩЕНИЙ
+# ==========================================
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
@@ -159,7 +167,7 @@ def handle_message(message):
         return
 
     if text in ["🔙 Главное меню", "🔙 Башкы меню", "🔙 Main Menu", "🔙 Ana Menü"]:
-        bot.send_message(message.chat.id, "Главное меню:", reply_markup=get_main_keyboard(lang))
+        bot.send_message(message.chat.id, "🏡 Главное меню:", reply_markup=get_main_keyboard(lang))
         return
 
     if text in ["🔄 Начать новый диалог", "🔄 Жаңы диалог баштоо", "🔄 Start New Dialogue", "🔄 Yeni Sohbet Başlat"]:
@@ -174,14 +182,14 @@ def handle_message(message):
 
     if text in COUNTRIES:
         user_data["country"] = text
-        msg = f"Выбрана страна: *{text}* 🎯\nЯ Барсбек, готов помочь!"
+        msg = f"Выбрана страна: *{text}* 🎯\nЯ Барсбек 🐆, ваш личный помощник. Чем могу помочь?"
         bot.send_message(message.chat.id, msg, parse_mode="Markdown", reply_markup=get_main_keyboard(lang))
         return
 
     if text in ["📝 Мой блокнот", "📝 Менин дептерим", "📝 My Notepad", "📝 Not Defterim"]:
         notes = user_data.get("notes", [])
         if not notes:
-            msg = "📝 Ваш блокнот пуст."
+            msg = "📝 Ваш блокнот пока пуст."
         else:
             notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)])
             msg = f"📝 **Ваши заметки:**\n\n{notes_str}"
@@ -190,29 +198,34 @@ def handle_message(message):
 
     if text in ["➕ Добавить заметку", "➕ Жаңы жазуу кошуу", "➕ Add Note", "➕ Not Ekle"]:
         user_data["state"] = "WAITING_FOR_NOTE"
-        bot.send_message(message.chat.id, "Введите текст заметки:")
+        bot.send_message(message.chat.id, "✍️ Введите текст заметки:")
         return
 
     if text in ["🗑 Очистить блокнот", "🗑 Дептерди тазалоо", "🗑 Clear Notepad", "🗑 Notları Temizle"]:
         user_data["notes"] = []
-        bot.send_message(message.chat.id, "🗑 Блокнот очищен!", reply_markup=get_notepad_keyboard(lang))
+        bot.send_message(message.chat.id, "🗑 Блокнот успешно очищен!", reply_markup=get_notepad_keyboard(lang))
         return
 
     if text in ["🌐 Сменить язык", "🌐 Тилди алмаштыруу", "🌐 Change Language", "🌐 Dili Değiştir"]:
-        bot.send_message(message.chat.id, "Выбери язык / Тилди тандаңыз:", reply_markup=get_language_keyboard())
+        bot.send_message(message.chat.id, "🌐 Выбери язык / Тилди тандаңыз:", reply_markup=get_language_keyboard())
         return
 
     if text in ["🌍 Сменить страну", "🌍 Өлкөнү алмаштыруу", "🌍 Change Country", "🌍 Ülke Değiştir"]:
-        bot.send_message(message.chat.id, "Выбери страну / Өлкөнү тандаңыз:", reply_markup=get_country_keyboard())
+        bot.send_message(message.chat.id, "🌍 Выбери страну / Өлкөнү тандаңыз:", reply_markup=get_country_keyboard())
         return
 
     selected_lang = user_data.get("lang", "🇷🇺 Русский")
     selected_country = user_data.get("country", "🇰🇬 Кыргызстан")
 
+    # Инструкция для ИИ по стилю и эмодзи
     system_prompt = (
-        f"Твое имя — Барсбек. Ты — профессиональный AI-консультант по поступлению в ВУЗы.\n"
+        f"Твое имя — Барсбек 🐆. Ты — дружелюбный, экспертный AI-консультант по поступлению в ВУЗы.\n"
         f"Выбранная страна: {selected_country}.\n"
-        f"ОБЯЗАТЕЛЬНО отвечай ИСКЛЮЧИТЕЛЬНО на языке: {selected_lang}."
+        f"ОБЯЗАТЕЛЬНО отвечай ИСКЛЮЧИТЕЛЬНО на языке: {selected_lang}.\n"
+        f"Правила оформления ответа:\n"
+        f"1. Активно используй подпадающие под контекст эмодзи (🎓, 🏛, 📜, 💡, 📌, ✨, 🚀, 🎯, 📑, 🔍).\n"
+        f"2. Делай ответы визуально структурированными и удобными для чтения.\n"
+        f"3. Оформляй важные заголовки и названия ВУЗов жирным шрифтом в формате Markdown (**текст**)."
     )
 
     prompt_query = text
@@ -227,9 +240,14 @@ def handle_message(message):
     elif text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
         prompt_query = f"Составь план действий для поступления в ВУЗы страны {selected_country}."
 
-    wait_msg = bot.send_message(message.chat.id, "⏳...")
+    wait_msg = bot.send_message(message.chat.id, "⏳ Думаю над ответом...")
     ai_response = ask_ai(prompt_query, system_prompt)
-    bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
+    
+    # Редактируем сообщение и включаем форматирование Markdown
+    try:
+        bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id, parse_mode="Markdown")
+    except Exception:
+        bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
