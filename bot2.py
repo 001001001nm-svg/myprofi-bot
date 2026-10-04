@@ -44,13 +44,13 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 user_states = {}
 admins = set()               # Набор ID администраторов
 banned_users = set()         # Заблокированные пользователи
-all_users = {}               # user_id -> {"username": str, "first_name": str, "join_date": str, "last_active": str}
+all_users = {}               # user_id -> info
 
 LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 English", "🇹🇷 Türkçe"]
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
 
 def clean_ai_response(text):
-    """Удаляет спецсимволы разметки (markdown)"""
+    """Очищает текст и форматирует его для легкого чтения"""
     lines = text.split('\n')
     filtered_lines = []
     for line in lines:
@@ -60,7 +60,7 @@ def clean_ai_response(text):
     
     res = "\n".join(filtered_lines).strip()
     
-    # Удаляем элементы markdown
+    # Удаляем тяжелую символику Markdown
     for char in ["*", "#", "_", "`", "~"]:
         res = res.replace(char, "")
         
@@ -75,7 +75,6 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
-    # Основная модель и запасы (включая самые быстрые варианты)
     models_to_try = [
         "google/gemini-2.0-flash-lite-001",
         "openai/gpt-4o-mini",
@@ -91,12 +90,11 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 400,
-            "temperature": 0.4
+            "max_tokens": 350,
+            "temperature": 0.3
         }
         
         try:
-            # Увеличенный таймаут 25 секунд
             response = requests.post(url, headers=headers, json=data, timeout=25)
             if response.status_code == 200:
                 res_data = response.json()
@@ -104,16 +102,14 @@ def ask_ai(prompt, system_instruction):
                     raw_content = res_data['choices'][0]['message']['content']
                     if raw_content and raw_content.strip():
                         return clean_ai_response(raw_content)
-            else:
-                print(f"Модель {model} вернула статус {response.status_code}")
         except Exception as e:
-            print(f"Ошибка запроса к {model}: {e}")
+            print(f"Ошибка с моделью {model}: {e}")
             continue
 
-    return "⚠️ Сервер ИИ перегружен. Пожалуйста, попробуйте еще раз через пару секунд."
+    return "⚠️ Сервер ИИ временно занят. Попробуйте еще раз через пару секунд."
 
 # ==========================================
-# 3. КЛАВИАТУРЫ
+# 3. КЛАВИАТУРЫ И ИНТЕРФЕЙС
 # ==========================================
 def get_language_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -199,6 +195,19 @@ def get_notepad_keyboard(lang):
         markup.row("🔙 Главное меню")
     return markup
 
+# Интерактивная клавиатура для «Моего пути» (чтобы не перегружать длинным текстом)
+def get_roadmap_inline_keyboard(lang):
+    markup = types.InlineKeyboardMarkup()
+    if lang == "🇰🇬 Кыргызча":
+        markup.add(types.InlineKeyboardButton("1️⃣ Даярдык жана сынактар", callback_data="road_1"))
+        markup.add(types.InlineKeyboardButton("2️⃣ Документтерди тапшыруу", callback_data="road_2"))
+        markup.add(types.InlineKeyboardButton("3️⃣ Виза жана учуп кетүү", callback_data="road_3"))
+    else:
+        markup.add(types.InlineKeyboardButton("1️⃣ Подготовка и экзамены", callback_data="road_1"))
+        markup.add(types.InlineKeyboardButton("2️⃣ Подача документов", callback_data="road_2"))
+        markup.add(types.InlineKeyboardButton("3️⃣ Виза и переезд", callback_data="road_3"))
+    return markup
+
 # ==========================================
 # 4. ОБРАБОТЧИКИ СООБЩЕНИЙ
 # ==========================================
@@ -248,7 +257,28 @@ def handle_ban_callback(call):
     target_id = int(call.data.split("_")[1])
     banned_users.add(target_id)
     bot.answer_callback_query(call.id, f"Участник {target_id} заблокирован!", show_alert=True)
-    bot.edit_message_text(f"⛔ Участник (ID: {target_id}) успешно заблокирован.", call.message.chat.id, call.message.message_id)
+    bot.edit_message_text(f"⛔ Участник (ID: {target_id}) заблокирован.", call.message.chat.id, call.message.message_id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("road_"))
+def handle_roadmap_steps(call):
+    user_id = call.from_user.id
+    user_data = user_states.get(user_id, {})
+    selected_country = user_data.get("country", "Канада")
+    selected_lang = user_data.get("lang", "🇷🇺 Русский")
+    step = call.data.split("_")[1]
+
+    steps_prompts = {
+        "1": f"Кратко распиши 1-й шаг поступления в {selected_country}: подготовка и языковые экзамены. Максимум 3 тезиса с эмодзи.",
+        "2": f"Кратко распиши 2-й шаг поступления в {selected_country}: сбор и подача документов в ВУЗ. Максимум 3 тезиса с эмодзи.",
+        "3": f"Кратко распиши 3-й шаг поступления в {selected_country}: получение визы и переезд. Максимум 3 тезиса с эмодзи."
+    }
+
+    bot.answer_callback_query(call.id, "Загружаю детали...")
+    
+    sys_prompt = f"You are Barsbek consultant. Language: {selected_lang}. Be short, concise, use emojis. NO MARKDOWN SYMBOLS like *, #, _."
+    ai_text = ask_ai(steps_prompts[step], sys_prompt)
+    
+    bot.send_message(call.message.chat.id, ai_text)
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
@@ -281,12 +311,11 @@ def handle_message(message):
     user_data = user_states[user_id]
     current_state = user_data.get("state")
 
-    # Назначение админа
+    # Админ
     if current_state == "WAITING_FOR_ADMIN_INPUT" and user_id == OWNER_ID:
         user_data["state"] = None
         target = text.strip().replace("@", "")
         found_id = None
-        
         if target.isdigit():
             found_id = int(target)
         else:
@@ -298,15 +327,11 @@ def handle_message(message):
         if found_id:
             admins.add(found_id)
             bot.send_message(message.chat.id, f"✅ Пользователь @{target} назначен администратором!", reply_markup=get_owner_panel_keyboard())
-            try:
-                bot.send_message(found_id, "🎉 Вы были назначены администратором бота!")
-            except:
-                pass
         else:
             bot.send_message(message.chat.id, "❌ Участник не найден.", reply_markup=get_owner_panel_keyboard())
         return
 
-    # 1. Выбор Языка -> Спрашиваем Имя
+    # 1. Выбор Языка
     if current_state == "WAITING_FOR_LANG" or text in LANGUAGES:
         if text in LANGUAGES:
             user_data["lang"] = text
@@ -320,7 +345,7 @@ def handle_message(message):
             bot.send_message(message.chat.id, msg_name, reply_markup=types.ReplyKeyboardRemove())
             return
 
-    # 2. Ввод Имени -> Спрашиваем Возраст
+    # 2. Ввод Имени
     if current_state == "WAITING_FOR_NAME":
         user_data["name"] = text
         user_data["state"] = "WAITING_FOR_AGE"
@@ -334,7 +359,7 @@ def handle_message(message):
         bot.send_message(message.chat.id, msg_age)
         return
 
-    # 3. Ввод Возраста -> Спрашиваем Страну
+    # 3. Ввод Возраста
     if current_state == "WAITING_FOR_AGE":
         user_data["age"] = text
         user_data["state"] = "WAITING_FOR_COUNTRY"
@@ -348,7 +373,7 @@ def handle_message(message):
         bot.send_message(message.chat.id, msg_country, reply_markup=get_country_keyboard())
         return
 
-    # 4. Выбор Страны -> Главное меню
+    # 4. Выбор Страны
     if current_state == "WAITING_FOR_COUNTRY" or text in COUNTRIES:
         if text in COUNTRIES:
             user_data["country"] = text
@@ -366,9 +391,7 @@ def handle_message(message):
 
     lang = user_data.get("lang", "🇷🇺 Русский")
 
-    # ==========================================
-    # КНОПКИ УПРАВЛЕНИЯ
-    # ==========================================
+    # Панели администрирования
     if text == "🛠 Панель Админа" and (user_id == OWNER_ID or user_id in admins):
         bot.send_message(message.chat.id, "🛠 Панель Администратора", reply_markup=get_admin_panel_keyboard())
         return
@@ -384,19 +407,6 @@ def handle_message(message):
     if text == "➕ Назначить администратором" and user_id == OWNER_ID:
         user_data["state"] = "WAITING_FOR_ADMIN_INPUT"
         bot.send_message(message.chat.id, "Введите @username или Telegram ID участника:")
-        return
-
-    if text == "📜 Список админов" and user_id == OWNER_ID:
-        owner_info = all_users.get(OWNER_ID, {})
-        owner_username = owner_info.get("username", "Неизвестно")
-        admin_list = [f"👑 Владелец: {owner_username} (ID: {OWNER_ID})"]
-        
-        for aid in admins:
-            info = all_users.get(aid, {})
-            u_str = info.get("username", "Без username")
-            admin_list.append(f"🛠 Админ: {u_str} (ID: {aid})")
-            
-        bot.send_message(message.chat.id, "\n".join(admin_list))
         return
 
     if text == "📊 Участников за сегодня" and (user_id == OWNER_ID or user_id in admins):
@@ -426,22 +436,11 @@ def handle_message(message):
     if current_state == "WAITING_FOR_NOTE":
         user_data["notes"].append(text)
         user_data["state"] = None
-        
-        if lang == "🇰🇬 Кыргызча": saved_msg = "✅ Жазуу сакталды!"
-        elif lang == "🇬🇧 English": saved_msg = "✅ Note saved!"
-        elif lang == "🇹🇷 Türkçe": saved_msg = "✅ Not kaydedildi!"
-        else: saved_msg = "✅ Заметка сохранена!"
-            
-        bot.send_message(message.chat.id, saved_msg, reply_markup=get_notepad_keyboard(lang))
+        bot.send_message(message.chat.id, "✅ Заметка сохранена!", reply_markup=get_notepad_keyboard(lang))
         return
 
     if text in ["🔙 Главное меню", "🔙 Башкы меню", "🔙 Main Menu", "🔙 Ana Menü"]:
-        if lang == "🇰🇬 Кыргызча": menu_msg = "🏡 Башкы меню:"
-        elif lang == "🇬🇧 English": menu_msg = "🏡 Main Menu:"
-        elif lang == "🇹🇷 Türkçe": menu_msg = "🏡 Ana Menü:"
-        else: menu_msg = "🏡 Главное меню:"
-            
-        bot.send_message(message.chat.id, menu_msg, reply_markup=get_main_keyboard(user_id, lang))
+        bot.send_message(message.chat.id, "🏡 Главное меню:", reply_markup=get_main_keyboard(user_id, lang))
         return
 
     if text in ["🔄 Начать новый диалог", "🔄 Жаңы диалог баштоо", "🔄 Start New Dialogue", "🔄 Yeni Sohbet Başlat"]:
@@ -451,38 +450,21 @@ def handle_message(message):
     if text in ["📝 Мой блокнот", "📝 Менин дептерим", "📝 My Notepad", "📝 Not Defterim"]:
         notes = user_data.get("notes", [])
         if not notes:
-            if lang == "🇰🇬 Кыргызча": msg = "📝 Сиздин дептериңиз азырынча бош."
-            elif lang == "🇬🇧 English": msg = "📝 Your notepad is empty."
-            elif lang == "🇹🇷 Türkçe": msg = "📝 Not defteriniz henüz boş."
-            else: msg = "📝 Ваш блокнот пока пуст."
+            msg = "📝 Ваш блокнот пока пуст."
         else:
             notes_str = "\n".join([f"{i+1}. {n}" for i, n in enumerate(notes)])
-            if lang == "🇰🇬 Кыргызча": msg = f"📝 Жазуулар:\n\n{notes_str}"
-            elif lang == "🇬🇧 English": msg = f"📝 Notes:\n\n{notes_str}"
-            elif lang == "🇹🇷 Türkçe": msg = f"📝 Notlar:\n\n{notes_str}"
-            else: msg = f"📝 Заметки:\n\n{notes_str}"
-            
+            msg = f"📝 Ваши заметки:\n\n{notes_str}"
         bot.send_message(message.chat.id, msg, reply_markup=get_notepad_keyboard(lang))
         return
 
     if text in ["➕ Добавить заметку", "➕ Жаңы жазуу кошуу", "➕ Add Note", "➕ Not Ekle"]:
         user_data["state"] = "WAITING_FOR_NOTE"
-        if lang == "🇰🇬 Кыргызча": add_msg = "✍️ Жазуунун текстин киргизиңиз:"
-        elif lang == "🇬🇧 English": add_msg = "✍️ Enter note text:"
-        elif lang == "🇹🇷 Türkçe": add_msg = "✍️ Not metnini girin:"
-        else: add_msg = "✍️ Введите текст заметки:"
-            
-        bot.send_message(message.chat.id, add_msg)
+        bot.send_message(message.chat.id, "✍️ Введите текст заметки:")
         return
 
     if text in ["🗑 Очистить блокнот", "🗑 Дептерди тазалоо", "🗑 Clear Notepad", "🗑 Notları Temizle"]:
         user_data["notes"] = []
-        if lang == "🇰🇬 Кыргызча": clr_msg = "🗑 Дептер тазаланды!"
-        elif lang == "🇬🇧 English": clr_msg = "🗑 Notepad cleared!"
-        elif lang == "🇹🇷 Türkçe": clr_msg = "🗑 Not defteri temizlendi!"
-        else: clr_msg = "🗑 Блокнот очищен!"
-            
-        bot.send_message(message.chat.id, clr_msg, reply_markup=get_notepad_keyboard(lang))
+        bot.send_message(message.chat.id, "🗑 Блокнот очищен!", reply_markup=get_notepad_keyboard(lang))
         return
 
     if text in ["🌐 Сменить язык", "🌐 Тилди алмаштыруу", "🌐 Change Language", "🌐 Dili Değiştir"]:
@@ -492,51 +474,53 @@ def handle_message(message):
 
     if text in ["🌍 Сменить страну", "🌍 Өлкөнү алмаштыруу", "🌍 Change Country", "🌍 Ülke Değiştir"]:
         user_data["state"] = "WAITING_FOR_COUNTRY"
-        if lang == "🇰🇬 Кыргызча": c_msg = "🌍 Өлкөнү тандаңыз:"
-        elif lang == "🇬🇧 English": c_msg = "🌍 Select country:"
-        elif lang == "🇹🇷 Türkçe": c_msg = "🌍 Ülke seçin:"
-        else: c_msg = "🌍 Выберите страну:"
-            
-        bot.send_message(message.chat.id, c_msg, reply_markup=get_country_keyboard())
+        bot.send_message(message.chat.id, "🌍 Выберите страну:", reply_markup=get_country_keyboard())
         return
 
-    # Запрос к ИИ
+    # СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ КНОПКИ «МОЙ ПУТЬ» (Разбиение на интерактивные шаги)
+    if text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
+        c_country = user_data.get("country", "Канада")
+        roadmap_intro = (
+            f"🗺 Пошаговый план поступления в страну: {c_country}\n\n"
+            f"Нажмите на интересующий этап ниже, чтобы узнать подробности:"
+        )
+        bot.send_message(message.chat.id, roadmap_intro, reply_markup=get_roadmap_inline_keyboard(lang))
+        return
+
+    # Запрос к ИИ для остальных кнопок
     selected_lang = user_data.get("lang", "🇷🇺 Русский")
     selected_country = user_data.get("country", "🇰🇬 Кыргызстан")
     user_name = user_data.get("name", "")
     user_age = user_data.get("age", "")
 
+    # СТРОГИЙ ПРОМПТ НА КРАТКОСТЬ И УДОБСТВО РЕДАКТИРОВАНИЯ
     system_prompt = (
-        f"You are Barsbek (Барсбек 🐆), an educational consultant AI.\n"
+        f"You are Barsbek (Барсбек 🐆), an expert education consultant.\n"
         f"User name: {user_name}, Age: {user_age}.\n"
-        f"Selected study country: {selected_country}.\n"
+        f"Selected country: {selected_country}.\n"
         f"CRITICAL: Answer ONLY in language: {selected_lang}.\n\n"
-        f"Formatting rules:\n"
-        f"1. Address student by name ({user_name}) briefly.\n"
-        f"2. Response MUST be clear and concise (3-5 bullet points or short paragraphs).\n"
-        f"3. Use emojis (🎓, 🏛, 📜, 💡).\n"
-        f"4. STRICTLY DO NOT USE MARKDOWN SYMBOLS LIKE *, #, _, `, ~ IN YOUR TEXT."
+        f"STRICT FORMATTING RULES:\n"
+        f"1. Keep response EXTREMELY SHORT, punchy, and readable.\n"
+        f"2. Use bullet points with emojis (🎓, 🏛, 📜, 💡).\n"
+        f"3. Maximum 3-4 short bullet points or sentences total.\n"
+        f"4. DO NOT write long paragraphs or essays.\n"
+        f"5. DO NOT USE MARKDOWN SYMBOLS LIKE *, #, _, `, ~."
     )
 
     prompt_query = text
     if text in ["📋 Условия поступления", "📋 Талаптар жана сынактар", "📋 Admission Requirements", "📋 Başvuru Şartları"]:
-        prompt_query = f"List admission requirements for universities in {selected_country}."
+        prompt_query = f"Give top 3 key admission requirements for universities in {selected_country}."
     elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Университет Seçimi"]:
-        prompt_query = f"List top universities in {selected_country}."
+        prompt_query = f"List top 4 best universities in {selected_country} with brief notes."
     elif text in ["📄 Необходимые документы", "📄 Керектүү документтер", "📄 Required Documents", "📄 Gerekli Belgeler"]:
-        prompt_query = f"List required documents for universities in {selected_country}."
+        prompt_query = f"List 4 essential documents needed for applying to {selected_country}."
     elif text in ["⚖️ Плюсы и Минусы", "⚖ Артыкчылыктар жана кемчиликтер", "⚖️ Pros and Cons", "⚖️ Artıları ve Eksileri"]:
-        prompt_query = f"Give pros and cons of studying in {selected_country}."
-    elif text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
-        prompt_query = f"Give a step-by-step roadmap to study in {selected_country}."
+        prompt_query = f"List 2 main pros and 2 main cons of studying in {selected_country}."
 
     thinking_txt = "⏳ Готовлю ответ..."
-    if selected_lang == "🇰🇬 Кыргызча":
-        thinking_txt = "⏳ Жүктөлүүдө..."
-    elif selected_lang == "🇬🇧 English":
-        thinking_txt = "⏳ Generating response..."
-    elif selected_lang == "🇹🇷 Türkçe":
-        thinking_txt = "⏳ Yanıt hazırlanıyor..."
+    if selected_lang == "🇰🇬 Кыргызча": thinking_txt = "⏳ Жүктөлүүдө..."
+    elif selected_lang == "🇬🇧 English": thinking_txt = "⏳ Generating response..."
+    elif selected_lang == "🇹🇷 Türkçe": thinking_txt = "⏳ Yanıt hazırlanıyor..."
 
     wait_msg = bot.send_message(message.chat.id, thinking_txt)
     ai_response = ask_ai(prompt_query, system_prompt)
