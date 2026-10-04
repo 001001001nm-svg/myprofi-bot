@@ -9,6 +9,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import telebot
 from telebot import types
 import requests
+from tavily import TavilyClient
 
 # ==========================================
 # 1. МИНИ ВЕБ-СЕРВЕР ДЛЯ RENDER
@@ -40,12 +41,16 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
 UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "odaMYOHO8tsFHyGe_Q8-0EZtab_NohgvOYRBEvtIkRE")
 
+# Твой ключ Tavily (из переменной окружения или напрямую вшит)
+TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "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")
+
 OWNER_ID = 8762115500
 
 if not TELEGRAM_TOKEN:
     raise ValueError("ОШИБКА: Переменная TELEGRAM_BOT_TOKEN не найдена!")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
+tavily_client = TavilyClient(api_key=TAVILY_KEY) if TAVILY_KEY else None
 
 DATA_FILE = "users_data.json"
 
@@ -83,7 +88,33 @@ LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 E
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
 
 # ==========================================
-# 3. ПОЛУЧЕНИЕ ФОТО С ФОЛБЭКОМ
+# 3. ФУНКЦИЯ ВЕБ-ПОИСКА (TAVILY API)
+# ==========================================
+def search_web(query):
+    """Ищет актуальную информацию в Интернете через Tavily API"""
+    if not tavily_client:
+        return ""
+    try:
+        response = tavily_client.search(
+            query=query,
+            search_depth="basic",
+            max_results=3
+        )
+        results = response.get("results", [])
+        if not results:
+            return ""
+            
+        snippets = []
+        for item in results:
+            snippets.append(f"Заголовок: {item.get('title')}\nИнформация: {item.get('content')}")
+            
+        return "\n\n".join(snippets)
+    except Exception as e:
+        print(f"Ошибка поиска в веб: {e}")
+        return ""
+
+# ==========================================
+# 4. ПОЛУЧЕНИЕ ФОТО С ФОЛБЭКОМ
 # ==========================================
 def fetch_photo_bytes(query):
     """Ищет фото на Unsplash, а при сбое берет резервную картинку"""
@@ -103,7 +134,6 @@ def fetch_photo_bytes(query):
         except Exception as e:
             print(f"Unsplash error: {e}")
 
-    # Фолбэк на случай сбоев Unsplash
     fallback_urls = [
         "https://picsum.photos/800/600",
         "https://picsum.photos/800/601"
@@ -149,7 +179,7 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 250,
+            "max_tokens": 300,
             "temperature": 0.4
         }
         try:
@@ -166,7 +196,7 @@ def ask_ai(prompt, system_instruction):
     return "🎓 Выберите интересующий вас раздел из меню ниже! 🚀"
 
 # ==========================================
-# 4. КЛАВИАТУРЫ
+# 5. КЛАВИАТУРЫ
 # ==========================================
 def get_language_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -233,7 +263,7 @@ def get_reels_inline_buttons():
     return markup
 
 # ==========================================
-# 5. ХЭНДЛЕРЫ I: ИНЛАЙН УПРАВЛЕНИЕ
+# 6. ХЭНДЛЕРЫ I: ИНЛАЙН УПРАВЛЕНИЕ
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
@@ -241,7 +271,6 @@ def handle_callbacks(call):
     user_id = call.from_user.id
     data = call.data
 
-    # Блокировка / разблокировка участника
     if data.startswith("ban_"):
         target_id = int(data.split("_")[1])
         banned_users.add(target_id)
@@ -258,7 +287,6 @@ def handle_callbacks(call):
         bot.edit_message_text(f"✅ Пользователь {target_id} разблокирован!", call.message.chat.id, call.message.message_id)
         return
 
-    # Снятие админа (Только Владелец)
     if data.startswith("removeadmin_"):
         if user_id != OWNER_ID:
             bot.answer_callback_query(call.id, "⛔ Доступно только Владельцу!")
@@ -270,7 +298,6 @@ def handle_callbacks(call):
         bot.edit_message_text(f"❌ Пользователь {target_id} больше не администратор.", call.message.chat.id, call.message.message_id)
         return
 
-    # Кнопки под фото
     if data.startswith("act_"):
         user_data = user_states.get(user_id, {})
         c_country = user_data.get("country", "Китай")
@@ -284,7 +311,6 @@ def handle_callbacks(call):
         if data == "act_more_photo":
             photo_file = fetch_photo_bytes(f"campus university {c_country}")
             short_caption = f"📸 Атмосфера обучения и кампус в {c_country}! 🎓✨🏛️"
-            
             if photo_file:
                 try:
                     bot.send_photo(call.message.chat.id, photo=photo_file, caption=short_caption, reply_markup=get_reels_inline_buttons())
@@ -309,7 +335,7 @@ def handle_callbacks(call):
         bot.send_message(call.message.chat.id, ai_text, reply_markup=get_reels_inline_buttons())
 
 # ==========================================
-# 6. ХЭНДЛЕРЫ II: СООБЩЕНИЯ
+# 7. ХЭНДЛЕРЫ II: СООБЩЕНИЯ
 # ==========================================
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -350,12 +376,10 @@ def handle_message(message):
     if user_id in banned_users:
         return
 
-    # Выключение бота для всех, кроме Владельца
     if not bot_enabled and user_id != OWNER_ID:
         bot.send_message(message.chat.id, "🔴 Бот временно выключен на техническое обслуживание.")
         return
 
-    # Регистрация пользователя в БД при активной переписке
     today_str = datetime.date.today().isoformat()
     username_str = f"@{message.from_user.username}" if message.from_user.username else f"ID: {user_id}"
     if user_id not in all_users:
@@ -376,7 +400,6 @@ def handle_message(message):
     user_data = user_states[user_id]
     current_state = user_data.get("state")
 
-    # Ввод логина админа владельцем
     if current_state == "WAITING_FOR_ADMIN_INPUT" and user_id == OWNER_ID:
         user_data["state"] = None
         target = text.strip().replace("@", "")
@@ -396,7 +419,6 @@ def handle_message(message):
             bot.send_message(message.chat.id, "❌ Участник не найден. Он должен хотя бы один раз написать боту!", reply_markup=get_owner_panel_keyboard())
         return
 
-    # Выбор Языка
     if current_state == "WAITING_FOR_LANG" or text in LANGUAGES:
         if text in LANGUAGES:
             user_data["lang"] = text
@@ -404,21 +426,18 @@ def handle_message(message):
             bot.send_message(message.chat.id, "Как тебя зовут? / Атыңыз ким? 😊", reply_markup=types.ReplyKeyboardRemove())
             return
 
-    # Имя
     if current_state == "WAITING_FOR_NAME":
         user_data["name"] = text
         user_data["state"] = "WAITING_FOR_AGE"
         bot.send_message(message.chat.id, f"Приятно познакомиться, {text}! 🤝 Сколько тебе лет? 🎂")
         return
 
-    # Возраст
     if current_state == "WAITING_FOR_AGE":
         user_data["age"] = text
         user_data["state"] = "WAITING_FOR_COUNTRY"
         bot.send_message(message.chat.id, "Выбери страну мечты для обучения: ✈️🌍", reply_markup=get_country_keyboard())
         return
 
-    # Страна
     if current_state == "WAITING_FOR_COUNTRY" or text in COUNTRIES:
         if text in COUNTRIES:
             user_data["country"] = text
@@ -440,9 +459,7 @@ def handle_message(message):
     lang = user_data.get("lang", "🇷🇺 Русский")
     c_country = user_data.get("country", "Китай")
 
-    # ==========================================
-    # ПАНЕЛИ УПРАВЛЕНИЯ И КОМАНДЫ ВЛАДЕЛЬЦА
-    # ==========================================
+    # Панели Владельца / Админа
     if text == "🛠 Панель Админа" and (user_id == OWNER_ID or user_id in admins):
         bot.send_message(message.chat.id, "🛠 Панель Администратора", reply_markup=get_admin_panel_keyboard())
         return
@@ -451,7 +468,6 @@ def handle_message(message):
         bot.send_message(message.chat.id, "👑 Панель Владельца", reply_markup=get_owner_panel_keyboard())
         return
 
-    # Переключатель выключения бота (ТОЛЬКО ВЛАДЕЛЕЦ)
     if text in ["🔴 Выключить бот", "🟢 Включить бот"] and user_id == OWNER_ID:
         bot_enabled = (text == "🟢 Включить бот")
         save_data()
@@ -464,14 +480,12 @@ def handle_message(message):
         bot.send_message(message.chat.id, "Введите @username или Telegram ID участника:")
         return
 
-    # «👥 Все участники» с кнопкой Заблокировать
     if text == "👥 Все участники" and (user_id == OWNER_ID or user_id in admins):
         if not all_users:
             bot.send_message(message.chat.id, "👥 Список участников пуст.")
             return
 
         bot.send_message(message.chat.id, f"👥 **Всего пользователей в базе: {len(all_users)}**", parse_mode="Markdown")
-        
         for uid, info in all_users.items():
             uname = info.get("username", f"ID: {uid}")
             name = info.get("first_name", "Пользователь")
@@ -487,14 +501,12 @@ def handle_message(message):
             bot.send_message(message.chat.id, f"👤 **{name}** ({uname}){status_str}\n🆔 `{uid}`", parse_mode="Markdown", reply_markup=markup)
         return
 
-    # «📋 Список администраторов» (ТОЛЬКО ВЛАДЕЛЕЦ)
     if text == "📋 Список администраторов" and user_id == OWNER_ID:
         if not admins:
             bot.send_message(message.chat.id, "📋 Список администраторов пуст.")
             return
 
         bot.send_message(message.chat.id, f"📋 **Назначенные администраторы ({len(admins)}):**", parse_mode="Markdown")
-        
         for admin_id in list(admins):
             info = all_users.get(admin_id, {})
             uname = info.get("username", f"ID: {admin_id}")
@@ -520,7 +532,6 @@ def handle_message(message):
         bot.send_message(message.chat.id, "🏡 Главное меню:", reply_markup=get_main_keyboard(user_id, lang))
         return
 
-    # Служебные меню
     if text in ["🌐 Сменить язык", "🌐 Тилди алмаштыруу"]:
         user_data["state"] = "WAITING_FOR_LANG"
         bot.send_message(message.chat.id, "Выберите язык:", reply_markup=get_language_keyboard())
@@ -535,38 +546,46 @@ def handle_message(message):
         start(message)
         return
 
-    # Генерация ответов на основные кнопки
+    # Генерация ответов с автоматическим веб-поиском
     try:
-        wait_msg = bot.send_message(message.chat.id, "⚡ Ищу информацию...")
+        wait_msg = bot.send_message(message.chat.id, "⚡ Ищу свежую информацию в Интернете...")
     except Exception:
         wait_msg = None
 
-    query_photo = f"university {c_country}"
-    
     if "Стипендии" in text or "Гранты" in text:
-        prompt_query = f"Расскажи про 2-3 главные стипендии/гранта в {c_country}. Обязательно напиши ТОЧНЫЕ СУММЫ стипендий в долларах $, сомах, рублях или юанях (например: 2500 RMB, ~350$, или до 30 000 сом в месяц)."
+        prompt_query = f"Расскажи про 2-3 главные стипендии/гранта в {c_country}. Обязательно напиши ТОЧНЫЕ СУММЫ стипендий в долларах $, сомах, рублях или юанях."
+        search_query = f"стипендии гранты {c_country} обучение точные суммы"
         query_photo = f"money graduation {c_country}"
     elif "ВУЗ" in text or "Колледж" in text or "ЖОЖ" in text:
         prompt_query = f"Назови 3 крутых ВУЗа в {c_country} с интересными фактами про них!"
+        search_query = f"топ университеты ВУЗы {c_country}"
         query_photo = f"university campus {c_country}"
     elif "Лайфхак" in text or "Талаптар" in text:
         prompt_query = f"Дай 3 огненных лайфхака для легкого поступления в {c_country}!"
+        search_query = f"как поступить в {c_country} требования"
         query_photo = f"students studying {c_country}"
     elif "Документ" in text:
         prompt_query = f"Список 5 главных документов для учебы в {c_country}."
+        search_query = f"документы для поступления в {c_country}"
         query_photo = f"passport documents"
     else:
         prompt_query = f"Кратко и интересно ответь на вопрос про учебу: '{text}'. Страна: {c_country}."
+        search_query = f"{text} учеба {c_country}"
         query_photo = f"university {c_country}"
+
+    # Выполняем веб-поиск
+    web_data = search_web(search_query)
 
     sys_prompt = (
         f"You are a super friendly educational consultant Barsbek 🐆!\n"
         f"Country: {c_country}. Language: {lang}.\n"
+        f"FRESH WEB DATA:\n{web_data}\n\n"
         f"IMPORTANT INSTRUCTIONS:\n"
-        f"1. USE LOTS OF EMOJIS! (🔥, 🎓, 💰, 🚀, ✨, 🌍, 💡, 💵) Make it exciting and easy to read!\n"
-        f"2. FOR SCHOLARSHIPS: ALWAYS write EXACT amounts and money figures in $, сом, руб, RMB, etc.\n"
-        f"3. Keep texts dynamic, concise, formatted with clear numbered lists or bullet points.\n"
-        f"4. NO MARKDOWN SYMBOLS (*, #, _)."
+        f"1. Use the FRESH WEB DATA provided above to give accurate up-to-date facts and figures!\n"
+        f"2. USE LOTS OF EMOJIS! (🔥, 🎓, 💰, 🚀, ✨, 🌍, 💡, 💵) Make it exciting!\n"
+        f"3. FOR SCHOLARSHIPS: ALWAYS write EXACT amounts in $, сом, руб, RMB, etc.\n"
+        f"4. Keep texts dynamic, concise, formatted with clear numbered lists.\n"
+        f"5. NO MARKDOWN SYMBOLS (*, #, _)."
     )
 
     ai_response = ask_ai(prompt_query, sys_prompt)
@@ -588,8 +607,8 @@ def handle_message(message):
     bot.send_message(message.chat.id, ai_response, reply_markup=get_reels_inline_buttons())
 
 # ==========================================
-# 7. ЗАПУСК БОТА С БЕСКОНЕЧНЫМ ПЕРЕЗАПУСКОМ
+# 8. ЗАПУСК БОТА
 # ==========================================
 if __name__ == "__main__":
-    print("Запуск бота Барсбек...")
+    print("Запуск бота Барсбек с функциями ИИ и веб-поиска...")
     bot.infinity_polling(timeout=20, long_polling_timeout=5)
