@@ -1,167 +1,176 @@
 import os
-import requests
-from flask import Flask
-from threading import Thread
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot import types
+import requests
 
-# ==========================================
-# 1. ИНИЦИАЛИЗАЦИЯ И ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
-# ==========================================
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+# 1. Запуск мини веб-сервера для Render (без внешних библиотек)
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
 
-bot = telebot.TeleBot(BOT_TOKEN)
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
 
-# Хранилище выбора пользователей (в памяти)
-user_data = {}
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
+    print(f"Web server running on port {port}")
+    server.serve_forever()
 
-# ==========================================
-# 2. ФУНКЦИЯ ДЛЯ ЗАПРОСА К OPENROUTER (GEMINI)
-# ==========================================
-def ask_gemini(prompt):
+threading.Thread(target=run_web_server, daemon=True).start()
+
+# 2. Инициализация Telegram бота
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
+
+if not TELEGRAM_TOKEN:
+    raise ValueError("ОШИБКА: Переменная TELEGRAM_BOT_TOKEN не найдена!")
+
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
+
+user_states = {}
+
+LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 English", "🇹🇷 Türkçe"]
+COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
+
+def get_language_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.row("🇷🇺 Русский", "🇰🇬 Кыргызча")
+    markup.row("🇬🇧 English", "🇹🇷 Türkçe")
+    return markup
+
+def get_country_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.row("🇰🇬 Кыргызстан", "🇹🇷 Турция")
+    markup.row("🇺🇸 США", "🇨🇳 Китай")
+    markup.row("🇰🇷 Южная Корея", "🇨🇦 Канада")
+    return markup
+
+def get_main_keyboard(lang):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    if lang == "🇰🇬 Кыргызча":
+        markup.row("📋 Талаптар жана сынактар", "🏛 ЖОЖдорду тандоо")
+        markup.row("📄 Керектүү документтер", "⚖️ Артыкчылыктар жана кемчиликтер")
+        markup.row("🗺 Менин жолум", "📝 Менин дептерим")
+        markup.row("🌍 Өлкөнү алмаштыруу", "🌐 Тилди алмаштыруу")
+        markup.row("🔄 Жаңы диалог баштоо")
+    elif lang == "🇬🇧 English":
+        markup.row("📋 Admission Requirements", "🏛 Select Universities")
+        markup.row("📄 Required Documents", "⚖️️ Pros and Cons")
+        markup.row("🗺 My Roadmap", "📝 My Notepad")
+        markup.row("🌍 Change Country", "🌐 Change Language")
+        markup.row("🔄 Start New Dialogue")
+    elif lang == "🇹🇷 Türkçe":
+        markup.row("📋 Başvuru Şartları", "🏛 Üniversite Seçimi")
+        markup.row("📄 Gerekli Belgeler", "⚖️ Artıları ve Eksileri")
+        markup.row("🗺 Yol Haritam", "📝 Not Defterim")
+        markup.row("🌍 Ülke Değiştir", "🌐 Dili Değiştir")
+        markup.row("🔄 Yeni Sohbet Başlat")
+    else:
+        markup.row("📋 Условия поступления", "🏛 Подбор ВУЗов")
+        markup.row("📄 Необходимые документы", "⚖️️ Плюсы и Минусы")
+        markup.row("🗺 Мой путь", "📝 Мой блокнот")
+        markup.row("🌍 Сменить страну", "🌐 Сменить язык")
+        markup.row("🔄 Начать новый диалог")
+    return markup
+
+def ask_ai(prompt, system_instruction):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://myprofi-bot.onrender.com",
-        "X-Title": "MyProfiKG Bot"
+        "HTTP-Referer": "https://render.com",
+        "X-Title": "Barsbek Bot"
     }
     
-    # Используем бесплатный вариативный идентификатор модели OpenRouter
-    payload = {
-        "model": "google/gemini-2.0-flash-lite-001:free",  # Или "openrouter/free"
+    data = {
+        "model": "google/gemini-2.0-flash-lite-001",
         "messages": [
-            {
-                "role": "system",
-                "content": "Ты — Барсбек, интеллектуальный ассистент профориентации и выбора ВУЗов MyProfiKG. Отвечай вежливо, четко, структурированно и с использованием эмодзи."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": prompt}
         ]
     }
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        data = response.json()
+        response = requests.post(url, headers=headers, json=data, timeout=60)
+        res_data = response.json()
         
-        if "choices" in data and len(data["choices"]) > 0:
-            return data["choices"][0]["message"]["content"]
-        elif "error" in data:
-            # Резервный вариант, если указанная модель недоступна
-            payload["model"] = "openrouter/free"
-            res2 = requests.post(url, json=payload, headers=headers, timeout=30)
-            data2 = res2.json()
-            if "choices" in data2 and len(data2["choices"]) > 0:
-                return data2["choices"][0]["message"]["content"]
-            return f"Ошибка ИИ: {data['error'].get('message', 'Неизвестная ошибка')}"
+        if 'choices' in res_data and len(res_data['choices']) > 0:
+            return res_data['choices'][0]['message']['content']
         else:
-            return "Не удалось получить ответ от ИИ. Попробуйте позже."
-            
+            print(f"OpenRouter Raw Error: {res_data}")
+            err_msg = res_data.get('error', {}).get('message', 'Неизвестная ошибка')
+            return f"Ошибка ИИ: {err_msg}"
     except Exception as e:
-        return f"Произошла ошибка при обращении к ИИ: {str(e)}"
+        print(f"Request exception: {e}")
+        return "Ошибка соединения с ИИ. Попробуй позже."
 
-# ==========================================
-# 3. КЛАВИАТУРЫ ДЛЯ ТЕЛЕГРАМ БОТА
-# ==========================================
-def get_language_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    markup.add(KeyboardButton("🇷🇺 Русский"), KeyboardButton("🇰🇬 Кыргызча"))
-    markup.add(KeyboardButton("🇬🇧 English"), KeyboardButton("🇹🇷 Türkçe"))
-    return markup
-
-def get_country_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    markup.add(KeyboardButton("🇰🇬 Кыргызстан"), KeyboardButton("🇺🇸 США"))
-    markup.add(KeyboardButton("🇩🇪 Германия"), KeyboardButton("🇹🇷 Турция"))
-    markup.add(KeyboardButton("🇷🇺 Россия"), KeyboardButton("🇨🇳 Китай"))
-    return markup
-
-def get_main_keyboard():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(KeyboardButton("🏛 Подбор ВУЗов"), KeyboardButton("📋 Условия поступления"))
-    markup.add(KeyboardButton("💡 Выбор профессии"), KeyboardButton("⚙️ Сменить страну/язык"))
-    return markup
-
-# ==========================================
-# 4. ОБРАБОТЧИКИ КОМАНД И СООБЩЕНИЙ
-# ==========================================
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    text = (
+def start(message):
+    user_id = message.from_user.id
+    user_states[user_id] = {"lang": None, "country": None, "notes": [], "state": None}
+    
+    msg = (
         "Салам! Мен Барсбекмин 🐆 / Здравствуйте! Я Барсбек 🐆 / "
         "Hello! I am Barsbek 🐆 / Merhaba! Ben Barsbek 🐆\n\n"
         "Выбери язык / Тилди тандаңыз / Select language / Dil seçin:"
     )
-    bot.send_message(message.chat.id, text, reply_markup=get_language_keyboard())
+    bot.send_message(message.chat.id, msg, reply_markup=get_language_keyboard())
 
-@bot.message_handler(func=lambda msg: msg.text in ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 English", "🇹🇷 Türkçe"])
-def set_language(message):
-    chat_id = message.chat.id
-    if chat_id not in user_data:
-        user_data[chat_id] = {}
-    user_data[chat_id]['lang'] = message.text
-    
-    text = "Тепер выбор страны / Өлкөнү тандаңыз / Select country / Ülke seçin:"
-    bot.send_message(chat_id, text, reply_markup=get_country_keyboard())
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    user_id = message.from_user.id
+    text = message.text
 
-@bot.message_handler(func=lambda msg: msg.text in ["🇰🇬 Кыргызстан", "🇺🇸 США", "🇩🇪 Германия", "🇹🇷 Турция", "🇷🇺 Россия", "🇨🇳 Китай"])
-def set_country(message):
-    chat_id = message.chat.id
-    if chat_id not in user_data:
-        user_data[chat_id] = {}
-    user_data[chat_id]['country'] = message.text
-    
-    bot.send_message(
-        chat_id, 
-        f"Выбрана страна: {message.text} 🎯\nЯ Барсбек, готов помочь!", 
-        reply_markup=get_main_keyboard()
+    if user_id not in user_states:
+        user_states[user_id] = {"lang": "🇷🇺 Русский", "country": "🇰🇬 Кыргызстан", "notes": [], "state": None}
+
+    user_data = user_states[user_id]
+    lang = user_data.get("lang", "🇷🇺 Русский")
+
+    if text in ["🔙 Главное меню", "🔙 Башкы меню", "🔙 Main Menu", "🔙 Ana Menü"]:
+        bot.send_message(message.chat.id, "Главное меню:", reply_markup=get_main_keyboard(lang))
+        return
+
+    if text in ["🔄 Начать новый диалог", "🔄 Жаңы диалог баштоо", "🔄 Start New Dialogue", "🔄 Yeni Sohbet Başlat"]:
+        start(message)
+        return
+
+    if text in LANGUAGES:
+        user_data["lang"] = text
+        msg = "Теперь выбери страну / Өлкөнү тандаңыз / Select country / Ülke seçin:"
+        bot.send_message(message.chat.id, msg, reply_markup=get_country_keyboard())
+        return
+
+    if text in COUNTRIES:
+        user_data["country"] = text
+        msg = f"Выбрана страна: *{text}* 🎯\nЯ Барсбек, готов помочь!"
+        bot.send_message(message.chat.id, msg, parse_mode="Markdown", reply_markup=get_main_keyboard(lang))
+        return
+
+    selected_lang = user_data.get("lang", "🇷🇺 Русский")
+    selected_country = user_data.get("country", "🇰🇬 Кыргызстан")
+
+    system_prompt = (
+        f"Твое имя — Барсбек. Ты — профессиональный AI-консультант по поступлению в ВУЗы.\n"
+        f"Выбранная страна: {selected_country}.\n"
+        f"ОБЯЗАТЕЛЬНО отвечай ИСКЛЮЧИТЕЛЬНО на языке: {selected_lang}."
     )
 
-@bot.message_handler(func=lambda msg: msg.text == "⚙️ Сменить страну/язык")
-def reset_settings(message):
-    send_welcome(message)
+    prompt_query = text
+    if text in ["📋 Условия поступления", "📋 Талаптар жана сынактар", "📋 Admission Requirements", "📋 Başvuru Шарты"]:
+        prompt_query = f"Расскажи подробно про условия поступления в ВУЗы страны {selected_country}."
+    elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Üniversite Seçimi"]:
+        prompt_query = f"Перечисли топ-5 лучших ВУЗов страны {selected_country}."
 
-@bot.message_handler(func=lambda msg: True)
-def handle_all_messages(message):
-    chat_id = message.chat.id
-    user_info = user_data.get(chat_id, {})
-    lang = user_info.get('lang', '🇷🇺 Русский')
-    country = user_info.get('country', '🇰🇬 Кыргызстан')
-    
-    bot.send_chat_action(chat_id, 'typing')
-    
-    prompt = (
-        f"Пользователь спрашивает: '{message.text}'.\n"
-        f"Язык ответа: {lang}.\n"
-        f"Интересующая страна для образования: {country}.\n"
-        f"Предоставь исчерпывающий, понятный и полезный ответ."
-    )
-    
-    response_text = ask_gemini(prompt)
-    bot.reply_to(message, response_text, reply_markup=get_main_keyboard())
+    wait_msg = bot.send_message(message.chat.id, "⏳...")
+    ai_response = ask_ai(prompt_query, system_prompt)
+    bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
 
-# ==========================================
-# 5. FLASK СЕРВЕР ДЛЯ РАБОТЫ НА RENDER
-# ==========================================
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "MyProfiKG Bot is running!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-# ==========================================
-# 6. ЗАПУСК
-# ==========================================
 if __name__ == "__main__":
-    t = Thread(target=run_flask)
-    t.start()
-    
-    print("Бот Барсбек успешно запущен...")
-    bot.infinity_polling(skip_pending_updates=True)
+    bot.polling(none_stop=True)
