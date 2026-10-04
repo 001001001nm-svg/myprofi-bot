@@ -1,17 +1,14 @@
 import os
 import telebot
 from telebot import types
-import google.generativeai as genai
+import requests
 
-# Инициализация
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
 
-# Хранилище стран
+# Хранилище выбранных стран
 user_countries = {}
 
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
@@ -27,6 +24,23 @@ def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("📋 Условия поступления", "🔄 Сменить страну")
     return markup
+
+def ask_ai(prompt):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "google/gemini-2.0-flash-lite-001",
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    try:
+        response = requests.post(url, json=data, headers=headers, timeout=60)
+        result = response.json()
+        return result['choices'][0]['message']['content']
+    except Exception as e:
+        return "Произошла ошибка при обращении к ИИ. Попробуй еще раз."
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -55,11 +69,8 @@ def requirements(message):
     )
     
     wait_msg = bot.send_message(message.chat.id, "⏳ Собираю актуальную информацию об условиях поступления...")
-    try:
-        response = model.generate_content(prompt)
-        bot.edit_message_text(response.text, message.chat.id, wait_msg.message_id)
-    except Exception:
-        bot.edit_message_text("Произошла ошибка при получении данных.", message.chat.id, wait_msg.message_id)
+    ai_response = ask_ai(prompt)
+    bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
@@ -71,7 +82,7 @@ def handle_message(message):
         bot.send_message(
             message.chat.id,
             f"Отлично! Выбрана страна: *{text}* 🎯\n\n"
-            f"Теперь все рекомендации будут касаться только этой страны.",
+            f"Теперь все рекомендации по ВУЗам будут касаться только этой страны.",
             parse_mode="Markdown",
             reply_markup=get_main_keyboard()
         )
@@ -95,11 +106,8 @@ def handle_message(message):
     full_prompt = f"{system_prompt}\n\nВопрос: {text}"
     wait_msg = bot.send_message(message.chat.id, "Думаю... 🧠")
 
-    try:
-        response = model.generate_content(full_prompt)
-        bot.edit_message_text(response.text, message.chat.id, wait_msg.message_id)
-    except Exception:
-        bot.edit_message_text("Не удалось получить ответ.", message.chat.id, wait_msg.message_id)
+    ai_response = ask_ai(full_prompt)
+    bot.edit_message_text(ai_response, message.chat.id, wait_msg.message_id)
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
