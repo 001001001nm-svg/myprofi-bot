@@ -1,243 +1,156 @@
-import telebot
-from telebot import types
-import requests
+import os
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, BotCommand
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+import google.generativeai as genai
 
-TELEGRAM_TOKEN = "8891087735:AAEtEcdQJxMuWVt5jTOq199tOpm4eLO_gQE"
-OPENROUTER_KEY = "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"
+# 1. Настройка Gemini API
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+model = genai.GenerativeModel("gemini-2.5-flash")
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+# Хранилище стран пользователей (в памяти)
+# Для боевого проекта лучше использовать БД (SQLite / PostgreSQL)
+user_countries = {}
 
-# Хранилище данных пользователей
-user_data = {}
+# Список доступных стран
+COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
 
-LANG_NAMES = {
-    "ru": "Русский",
-    "kg": "Кыргызча (Кыргыз тили)",
-    "en": "English",
-    "tr": "Türkçe"
-}
-
-# Функция для создания нижних кнопок меню
-def get_main_menu_keyboard():
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn_new = types.KeyboardButton("🔄 Новый диалог")
-    btn_profile = types.KeyboardButton("🚀 Мой путь")
-    btn_lang = types.KeyboardButton("🌐 Изменить язык")
-    btn_plus = types.KeyboardButton("➕ Плюсы")
-    btn_minus = types.KeyboardButton("➖ Минусы")
-    btn_salary = types.KeyboardButton("💰 Какая зарплата")
-    btn_study = types.KeyboardButton("🎓 Куда поступать")
-    
-    keyboard.add(btn_new, btn_profile)
-    keyboard.add(btn_lang)
-    keyboard.add(btn_plus, btn_minus)
-    keyboard.add(btn_salary, btn_study)
-    return keyboard
-
-def get_language_keyboard():
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    buttons = [
-        types.InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang_ru"),
-        types.InlineKeyboardButton(text="🇰🇬 Кыргызча", callback_data="lang_kg"),
-        types.InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en"),
-        types.InlineKeyboardButton(text="🇹🇷 Türkçe", callback_data="lang_tr")
+def get_country_keyboard():
+    """Клавиатура выбора стран"""
+    keyboard = [
+        [KeyboardButton("🇰🇬 Кыргызстан"), KeyboardButton("🇹🇷 Турция")],
+        [KeyboardButton("🇺🇸 США"), KeyboardButton("🇨🇳 Китай")],
+        [KeyboardButton("🇰🇷 Южная Корея"), KeyboardButton("🇨🇦 Канада")]
     ]
-    keyboard.add(*buttons)
-    return keyboard
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
-@bot.message_handler(commands=['start', 'new'])
-def send_welcome(message):
-    chat_id = message.chat.id
-    user_data[chat_id] = {
-        "lang": "ru",
-        "step": "lang",
-        "name": "",
-        "age": "",
-        "grade": "",
-        "history": []
-    }
+def get_main_keyboard():
+    """Главная клавиатура после выбора страны"""
+    keyboard = [
+        [KeyboardButton("📋 Условия поступления"), KeyboardButton("🔄 Сменить страну")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+# Команда /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     
     welcome_text = (
-        "Саламатсызбы! 👋 Тилди тандаңыз / Пожалуйста, выберите язык:\n\n"
-        "🌐 Choose your preferred language:"
+        "Привет! Я твой профориентационный AI-помощник MyProfiKG 🎓\n\n"
+        "Выбери страну, в которой ты планируешь поступать в ВУЗ:"
     )
-    bot.send_message(chat_id, welcome_text, reply_markup=get_language_keyboard())
+    await update.message.reply_text(welcome_text, reply_markup=get_country_keyboard())
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
-def callback_lang(call):
-    chat_id = call.message.chat.id
-    lang_code = call.data.split("_")[1]
-    
-    if chat_id not in user_data:
-        user_data[chat_id] = {"history": [], "lang": lang_code, "step": "chat"}
-    
-    user_data[chat_id]["lang"] = lang_code
-    
-    bot.answer_callback_query(call.id)
-    
-    # Если мы сменяем язык во время готового профиля
-    if user_data[chat_id].get("step") == "chat":
-        confirm_msgs = {
-            "ru": "Язык успешно изменён! 🌐 Чем я могу тебе помочь?",
-            "kg": "Тил ийгиликтүү алмаштырылды! 🌐 Сизге кантип жардам бере алам?",
-            "en": "Language successfully changed! 🌐 How can I help you?",
-            "tr": "Dil başarıyla değiştirildi! 🌐 Size nasıl yardımcı olabilirim?"
-        }
-        bot.send_message(chat_id, confirm_msgs.get(lang_code, confirm_msgs["ru"]), reply_markup=get_main_menu_keyboard())
-        return
+# Команда или кнопка "Сменить страну"
+async def change_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Выбери новую страну для поступления:",
+        reply_markup=get_country_keyboard()
+    )
 
-    # Первичная настройка (анкетирование)
-    user_data[chat_id]["step"] = "ask_name"
-    if lang_code == "kg":
-        bot.send_message(chat_id, "Эң сонун! 🌟 Атыңыз ким? Атыңызды жазыңыз:")
-    elif lang_code == "en":
-        bot.send_message(chat_id, "Great! 🌟 What is your name?")
-    elif lang_code == "tr":
-        bot.send_message(chat_id, "Harika! 🌟 Adınız nedir?")
-    else:
-        bot.send_message(chat_id, "Отлично! 🌟 Как тебя зовут? Напиши своё имя:")
-
-@bot.message_handler(func=lambda message: True)
-def handle_all_messages(message):
-    chat_id = message.chat.id
-    user_text = message.text
+# Команда или кнопка "Условия поступления"
+async def requirements(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    country = user_countries.get(user_id, "не выбрана (по умолчанию Кыргызстан)")
     
-    if chat_id not in user_data:
-        send_welcome(message)
-        return
+    prompt = (
+        f"Пользователь спрашивает про условия поступления в ВУЗы страны: {country}.\n"
+        f"Расскажи подробно и структурировано:\n"
+        f"1. Основные экзамены и баллы (для Кыргызстана — про ОРТ и пороговые баллы, для США — SAT/TOEFL, для Турции — YÖS/TR-YÖS и т.д.).\n"
+        f"2. Необходимые документы.\n"
+        f"3. Языковые требования.\n"
+        f"4. Сроки подачи документов.\n"
+        f"Пиши понятно, используй эмодзи и списки."
+    )
+    
+    waiting_msg = await update.message.reply_text("⏳ Собираю актуальную информацию об условиях поступления...")
+    
+    try:
+        response = model.generate_content(prompt)
+        await waiting_msg.edit_text(response.text)
+    except Exception as e:
+        await waiting_msg.edit_text("Произошла ошибка при получении данных. Попробуй еще раз чуть позже.")
 
-    lang = user_data[chat_id].get("lang", "ru")
-    step = user_data[chat_id].get("step", "chat")
+# Обработчик всех текстовых сообщений
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    text = update.message.text
 
-    # Обработка нажатий на кнопки меню
-    if user_text == "🔄 Новый диалог":
-        send_welcome(message)
-        return
-    elif user_text == "🚀 Мой путь":
-        show_profile(message)
-        return
-    elif user_text == "🌐 Изменить язык":
-        welcome_text = (
-            "Тилди тандаңыз / Пожалуйста, выберите язык / Choose your language:"
+    # Если пользователь выбрал страну из списка
+    if text in COUNTRIES:
+        user_countries[user_id] = text
+        await update.message.reply_text(
+            f"Отлично! Выбрана страна: **{text}** 🎯\n\n"
+            f"Теперь все мои ответы и рекомендации по ВУЗам и профессиям будут касаться только этой страны.\n"
+            f"Задай мне любой вопрос или нажми «📋 Условия поступления»!",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard()
         )
-        bot.send_message(chat_id, welcome_text, reply_markup=get_language_keyboard())
-        return
-    elif user_text == "➕ Плюсы":
-        user_text = "Расскажи подробно про ПЛЮСЫ этой профессии, о которой мы говорили!"
-    elif user_text == "➖ Минусы":
-        user_text = "Расскажи подробно про МИНУСЫ и сложности этой профессии, о которой мы говорили!"
-    elif user_text == "💰 Какая зарплата":
-        user_text = "Какая зарплата у этой профессии в Кыргызстане?"
-    elif user_text == "🎓 Куда поступать":
-        user_text = "В какие ВУЗы или колледжи Кыргызстана лучше всего поступать на эту специальность?"
-
-    # Пошаговое анкетирование
-    if step == "ask_name":
-        user_data[chat_id]["name"] = user_text
-        user_data[chat_id]["step"] = "ask_age"
-        if lang == "kg":
-            bot.send_message(chat_id, f"Таанышканыма кубанычтамын, {user_text}! 👋 Жашыңыз канчада?")
-        else:
-            bot.send_message(chat_id, f"Рад знакомству, {user_text}! 👋 Сколько тебе лет?")
         return
 
-    elif step == "ask_age":
-        user_data[chat_id]["age"] = user_text
-        user_data[chat_id]["step"] = "ask_grade"
-        if lang == "kg":
-            bot.send_message(chat_id, "Сонун! 🎯 Канчанчы класста (же курста) окуйсуз?")
-        else:
-            bot.send_message(chat_id, "Супер! 🎯 В каком классе ты учишься (или на каком курсе)?")
+    # Обработка нажатий на текстовые кнопки меню
+    if text == "🔄 Сменить страну":
+        await change_country(update, context)
+        return
+    elif text == "📋 Условия поступления":
+        await requirements(update, context)
         return
 
-    elif step == "ask_grade":
-        user_data[chat_id]["grade"] = user_text
-        user_data[chat_id]["step"] = "chat"
-        name = user_data[chat_id]["name"]
-        
-        if lang == "kg":
-            text = f"Эң сонун, {name}! 🎉 Профилиңиз даяр!\n\nМага каалаган сурооңузду бериңиз: кесиптер, жогорку окуу жайлар, ЖРТ же айлык акы жөнүндө. Мен жардам берүүгө даярмын! 🚀"
-        else:
-            text = f"Замечательно, {name}! 🎉 Теперь наш профиль настроен!\n\nЗадай мне любой вопрос: про профессии, ВУЗы, ОРТ или зарплаты. Я готов помогать! 🚀"
-            
-        bot.send_message(chat_id, text, reply_markup=get_main_menu_keyboard())
-        return
+    # Получаем текущую страну пользователя (если не выбрана — ставим Кыргызстан)
+    selected_country = user_countries.get(user_id, "Кыргызстан")
 
-    # Генерация ответа ИИ с использованием заданного языка
-    bot.send_chat_action(chat_id, 'typing')
+    # Формируем системный промпт
+    system_prompt = (
+        f"Ты — экспертный профориентационный AI-консультант MyProfiKG.\n"
+        f"Текущая выбранная страна пользователя: {selected_country}.\n"
+        f"СТРОГОЕ ПРАВИЛО: Отвечай на вопросы пользователя, касающиеся ВУЗов, профессий, "
+        f"грантов, стипендий и образования, ИСКЛЮЧИТЕЛЬНО применительно к стране: {selected_country}.\n"
+        f"Если пользователь спрашивает про другие страны, напомни ему, что можно сменить страну в меню кнопкой '🔄 Сменить страну'.\n"
+        f"Отвечай вежливо, структурировано, на языке пользователя."
+    )
 
-    history = user_data[chat_id].get("history", [])
-    selected_lang_name = LANG_NAMES.get(lang, "Русский")
+    full_prompt = f"{system_prompt}\n\nВопрос пользователя: {text}"
 
-    system_prompt = f"""
-Ты — позитивный, доброжелательный и вдохновляющий эксперт по профориентации MyProfiKG в Кыргызстане! 🎯🌟
-
-КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО:
-Отвечай СТРОГО на языке: {selected_lang_name}! 
-Если выбран Кыргызча — отвечай ТОЛЬКО на кыргызском языке!
-
-Твои правила общения:
-1. Используй эмодзи 🚀🎓💡✨, чтобы текст выглядел живым и интересным.
-2. Будь на позитиве, поддерживай пользователя и немного хвали за хорошие цели и вопросы.
-3. Учитывай данные пользователя: Имя={user_data[chat_id].get('name')}, Возраст={user_data[chat_id].get('age')}, Класс={user_data[chat_id].get('grade')}.
-4. Запоминай предыдущий контекст бесед.
-"""
-
-    messages_payload = [{"role": "system", "content": system_prompt}]
-    
-    for h in history[-6:]:
-        messages_payload.append(h)
-        
-    messages_payload.append({"role": "user", "content": user_text})
-
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "openai/gpt-4o-mini",
-        "messages": messages_payload
-    }
+    waiting_msg = await update.message.reply_text("Thinking... 🧠")
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            ai_answer = result["choices"][0]["message"]["content"]
-            
-            user_data[chat_id]["history"].append({"role": "user", "content": user_text})
-            user_data[chat_id]["history"].append({"role": "assistant", "content": ai_answer})
-            
-            try:
-                bot.send_message(chat_id, ai_answer, parse_mode='Markdown', reply_markup=get_main_menu_keyboard())
-            except Exception:
-                bot.send_message(chat_id, ai_answer, reply_markup=get_main_menu_keyboard())
-        else:
-            bot.send_message(chat_id, "Упс! Возникла небольшая ошибка. Попробуй ещё раз чуть позже! 😅", reply_markup=get_main_menu_keyboard())
-    except Exception:
-        bot.send_message(chat_id, "Ошибка соединения. Проверь интернет и попробуй снова! 🌐", reply_markup=get_main_menu_keyboard())
+        response = model.generate_content(full_prompt)
+        await waiting_msg.edit_text(response.text)
+    except Exception as e:
+        await waiting_msg.edit_text("Не удалось получить ответ от ИИ. Попробуй переформулировать вопрос.")
 
-def show_profile(message):
-    chat_id = message.chat.id
-    info = user_data.get(chat_id, {})
-    name = info.get("name", "Не указано")
-    age = info.get("age", "Не указан")
-    grade = info.get("grade", "Не указан")
-    
-    text = (
-        f"🚀 *Твой путь в MyProfiKG*:\n\n"
-        f"👤 *Имя:* {name}\n"
-        f"🎂 *Возраст:* {age}\n"
-        f"📚 *Класс/Курс:* {grade}\n\n"
-        f"Ты на верном пути к своей мечте! 🌟"
-    )
-    bot.send_message(chat_id, text, parse_mode='Markdown', reply_markup=get_main_menu_keyboard())
+# Настройка меню команд Telegram (возле скрепки)
+async def post_init(application: Application):
+    commands = [
+        BotCommand("start", "Запустить бота / Перевыбрать страну"),
+        BotCommand("change_country", "Сменить страну поступления"),
+        BotCommand("requirements", "Условия поступления (ОРТ, экзамены)")
+    ]
+    await application.bot.set_my_commands(commands)
 
-try:
-    bot.remove_webhook()
-except Exception:
-    pass
+def main():
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        print("Ошибка: Не задан TELEGRAM_BOT_TOKEN")
+        return
 
-print("Бот MyProfiKG с выбором языка запущен!")
-bot.infinity_polling()
+    app = Application.builder().token(token).post_init(post_init).build()
+
+    # Хэндлеры команд
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("change_country", change_country))
+    app.add_handler(CommandHandler("requirements", requirements))
+
+    # Хэндлер сообщений
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("Бот запущен...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
