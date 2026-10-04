@@ -75,9 +75,12 @@ def ask_ai(prompt, system_instruction):
         "X-Title": "Barsbek Bot"
     }
     
+    # Модели с молниеносным откликом
     models_to_try = [
-        "google/gemini-2.0-flash-lite-preview-02-05:free",
-        "meta-llama/llama-3.3-70b-instruct:free"
+        "google/gemini-2.0-flash-001",
+        "google/gemini-flash-1.5",
+        "qwen/qwen-2.5-7b-instruct:free",
+        "meta-llama/llama-3.2-3b-instruct:free"
     ]
     
     for model in models_to_try:
@@ -87,21 +90,22 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 500
+            "max_tokens": 300,
+            "temperature": 0.5
         }
         
         try:
-            # Увеличен timeout до 15 секунд
-            response = requests.post(url, headers=headers, json=data, timeout=15)
+            response = requests.post(url, headers=headers, json=data, timeout=8)
             res_data = response.json()
             
             if 'choices' in res_data and len(res_data['choices']) > 0:
                 raw_content = res_data['choices'][0]['message']['content']
-                return clean_ai_response(raw_content)
+                if raw_content:
+                    return clean_ai_response(raw_content)
         except Exception:
             continue
 
-    return "⚠ Сервер ИИ не успел ответить за 15 секунд. Пожалуйста, отправьте запрос повторно!"
+    return "⚠ Не удалось получить быстрый ответ. Пожалуйста, повторите запрос!"
 
 # ==========================================
 # 3. КЛАВИАТУРЫ
@@ -501,11 +505,11 @@ def handle_message(message):
         f"You are Barsbek (Барсбек 🐆), an educational consultant AI.\n"
         f"User name: {user_name}, Age: {user_age}.\n"
         f"Selected study country: {selected_country}.\n"
-        f"CRITICAL: You MUST answer EXCLUSIVELY and ONLY in language: {selected_lang}. Do not switch languages.\n\n"
+        f"CRITICAL: You MUST answer EXCLUSIVELY and ONLY in language: {selected_lang}.\n\n"
         f"Formatting rules:\n"
         f"1. Address student by name ({user_name}) if applicable.\n"
-        f"2. Keep response concise and brief (up to 3-4 short paragraphs).\n"
-        f"3. Use emojis (🎓, 🏛, 📜, 💡, 📌, ✨, 🚀).\n"
+        f"2. Keep response very short and concise (1-2 brief paragraphs).\n"
+        f"3. Use emojis (🎓, 🏛, 📜, 💡).\n"
         f"4. STRICTLY DO NOT USE MARKDOWN SYMBOLS LIKE *, #, _, `, ~ IN YOUR TEXT."
     )
 
@@ -521,13 +525,13 @@ def handle_message(message):
     elif text in ["🗺 Мой путь", "🗺 Менин жолум", "🗺 My Roadmap", "🗺 Yol Haritam"]:
         prompt_query = f"Create a step-by-step roadmap to apply for universities in {selected_country}."
 
-    thinking_txt = "⏳ Думаю, ответ будет по времени до 15 секунд..."
+    thinking_txt = "⏳ Формирую быстрый ответ..."
     if selected_lang == "🇰🇬 Кыргызча":
-        thinking_txt = "⏳ Ойлонуп жатам, жооп 15 секундага чейин убакытты алышы мүмкүн..."
+        thinking_txt = "⏳ Даярдап жатам..."
     elif selected_lang == "🇬🇧 English":
-        thinking_txt = "⏳ Thinking, response may take up to 15 seconds..."
+        thinking_txt = "⏳ Generating response..."
     elif selected_lang == "🇹🇷 Türkçe":
-        thinking_txt = "⏳ Düşünüyorum, yanıt 15 saniyeye kadar sürebilir..."
+        thinking_txt = "⏳ Yanıt hazırlanıyor..."
 
     wait_msg = bot.send_message(message.chat.id, thinking_txt)
     ai_response = ask_ai(prompt_query, system_prompt)
