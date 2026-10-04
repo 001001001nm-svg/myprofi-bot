@@ -43,14 +43,12 @@ LANGUAGES = ["🇷🇺 Русский", "🇰🇬 Кыргызча", "🇬🇧 E
 COUNTRIES = ["🇰🇬 Кыргызстан", "🇹🇷 Турция", "🇺🇸 США", "🇨🇳 Китай", "🇰🇷 Южная Корея", "🇨🇦 Канада"]
 
 def clean_ai_response(text):
-    """Очищает текст от лишних меток"""
-    # Удаляем служебную надпись User Safety
+    """Очищает текст от мусорных служебных меток"""
     lines = text.split('\n')
     filtered_lines = []
     for line in lines:
         if "user safety:" in line.lower():
             continue
-        # Заменяем markdown заголовки ### на жирный шрифт
         cleaned_line = line
         if cleaned_line.startswith("###") or cleaned_line.startswith("##") or cleaned_line.startswith("#"):
             cleaned_line = "**" + cleaned_line.lstrip("#").strip() + "**"
@@ -67,7 +65,7 @@ def ask_ai(prompt, system_instruction):
     }
     
     data = {
-        "model": "meta-llama/llama-3.3-70b-instruct:free",
+        "model": "google/gemini-2.0-flash-lite-001",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
@@ -290,7 +288,7 @@ def handle_message(message):
     prompt_query = text
     if text in ["📋 Условия поступления", "📋 Талаптар жана сынактар", "📋 Admission Requirements", "📋 Başvuru Şartları"]:
         prompt_query = f"Расскажи подробно про условия поступления в ВУЗы страны {selected_country}."
-    elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Университет Seçimi"]:
+    elif text in ["🏛 Подбор ВУЗов", "🏛 ЖОЖдорду тандоо", "🏛 Select Universities", "🏛 Üniversite Seçimi"]:
         prompt_query = f"Перечисли топ-5 лучших ВУЗов страны {selected_country}."
     elif text in ["📄 Необходимые документы", "📄 Керектүү документтер", "📄 Required Documents", "📄 Gerekli Belgeler"]:
         prompt_query = f"Какой список документов нужен для подачи в ВУЗы страны {selected_country}?"
