@@ -106,7 +106,7 @@ def ask_ai(prompt, system_instruction):
     }
     
     data = {
-        "model": "meta-llama/llama-3.3-70b-instruct:free",
+        "model": "google/gemini-2.0-flash-lite-001",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
