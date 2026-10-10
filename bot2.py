@@ -10,7 +10,7 @@ import telebot
 from telebot import types
 import requests
 from tavily import TavilyClient
-TOKEN = "8963845436:AAEX8346I6DEZGnDKCdqIcXBW6STyGlBxeo"
+TELEGRAM_TOKEN = "8963845436:AAEX8346I6DEZGnDKCdqIcXBW6STyGlBxeo"
 SUPABASE_URL = "https://rjkahchakzwiypagqvyr.supabase.co"
 SUPABASE_KEY = "sb_publishable_sCoWnEW2wwYA5R6h8dwgNg_RyrFeFgC"
 # ==========================================
