@@ -23,9 +23,9 @@
         <div class="container mx-auto flex justify-between items-center">
             <span><i class="fa-regular fa-clock mr-1"></i> Время Доставки: 08:00 - 20:00</span>
             <div class="hidden md:flex space-x-6 text-xs font-medium">
-                <a href="#" class="hover:underline">Новинки</a>
-                <a href="#" class="hover:underline">Выбор редакции</a>
-                <a href="#" class="hover:underline">Товары со скидкой</a>
+                <button onclick="filterProducts('new')" class="hover:underline cursor-pointer">Новинки</button>
+                <button onclick="filterProducts('discount')" class="hover:underline cursor-pointer">Товары со скидкой</button>
+                <button onclick="filterProducts('all')" class="hover:underline cursor-pointer">Все товары</button>
             </div>
         </div>
     </div>
@@ -34,20 +34,20 @@
     <header class="bg-white border-b sticky top-0 z-30 shadow-sm">
         <div class="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <!-- Логотип -->
-            <a href="#" class="flex items-center gap-2 text-2xl font-black text-brand-green tracking-tight">
+            <a href="#" onclick="filterProducts('all'); return false;" class="flex items-center gap-2 text-2xl font-black text-brand-green tracking-tight">
                 <i class="fa-solid fa-basket-shopping"></i>
                 <span>Продуктовый Магазин</span>
             </a>
 
             <!-- Поиск -->
             <div class="flex-1 max-w-2xl relative hidden sm:block">
-                <input type="text" placeholder="Поиск в Продуктовом Магазине..." class="w-full bg-gray-100 rounded-full py-2 pl-4 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 border border-gray-200">
+                <input type="text" id="search-input" oninput="searchProducts()" placeholder="Поиск в Продуктовом Магазине..." class="w-full bg-gray-100 rounded-full py-2 pl-4 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 border border-gray-200">
                 <button class="absolute right-3 top-2.5 text-gray-400 hover:text-brand-green">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
             </div>
 
-            <!-- Иконки корзины и профиля -->
+            <!-- Иконки корзины -->
             <div class="flex items-center gap-4">
                 <button onclick="toggleCart()" class="relative p-2 text-gray-700 hover:text-brand-green transition">
                     <i class="fa-solid fa-cart-shopping text-2xl"></i>
@@ -66,34 +66,19 @@
                 <i class="fa-solid fa-bars text-brand-green"></i> Каталог
             </h3>
             <nav class="space-y-1 text-sm font-medium text-gray-700">
-                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
-                    <span>☕ Кофе, чай и какао</span>
-                </a>
-                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
-                    <span>🍬 Сладости и десерты</span>
-                </a>
-                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
-                    <span>🥜 Снеки и орехи</span>
-                </a>
-                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
-                    <span>🥤 Напитки и соки</span>
-                </a>
-                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
-                    <span>🍜 Рамен и лапша</span>
-                </a>
-                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
-                    <span>🧊 Замороженная продукция</span>
-                </a>
-                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
-                    <span>🥫 Консервы и соусы</span>
-                </a>
+                <button onclick="filterByCategory('Кофе')" class="w-full text-left p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">☕ Кофе, чай и какао</button>
+                <button onclick="filterByCategory('Сладости')" class="w-full text-left p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">🍬 Сладости и десерты</button>
+                <button onclick="filterByCategory('Снеки')" class="w-full text-left p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">🥜 Снеки и орехи</button>
+                <button onclick="filterByCategory('Напитки')" class="w-full text-left p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">🥤 Напитки и соки</button>
+                <button onclick="filterByCategory('Рамен')" class="w-full text-left p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">🍜 Рамен и лапша</button>
+                <button onclick="filterByCategory('all')" class="w-full text-left p-2 rounded-xl bg-emerald-50 text-brand-green font-bold mt-2">📂 Показать все</button>
             </nav>
         </aside>
 
         <!-- Центральная часть -->
         <main class="flex-1 space-y-6">
 
-            <!-- РЕКЛАМНЫЙ СЛАЙДЕР (Карусель рекламы) -->
+            <!-- РЕКЛАМНЫЙ СЛАЙДЕР -->
             <div class="relative bg-emerald-900 text-white rounded-2xl overflow-hidden shadow-md h-48 sm:h-64 flex items-center">
                 <!-- Слайд 1 -->
                 <div class="banner-slide active w-full h-full p-6 sm:p-10 flex justify-between items-center bg-gradient-to-r from-emerald-800 to-teal-900">
@@ -109,13 +94,13 @@
                 <div class="banner-slide w-full h-full p-6 sm:p-10 flex justify-between items-center bg-gradient-to-r from-green-800 to-emerald-900">
                     <div class="space-y-2 max-w-md">
                         <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">БЫСТРАЯ ДОСТАВКА</span>
-                        <h2 class="text-xl sm:text-3xl font-extrabold">Бесплатная доставка от 1000 сом</h2>
+                        <h2 class="text-xl sm:text-3xl font-extrabold">Бесплатная доставка от 1000 ₽</h2>
                         <p class="text-xs sm:text-sm text-emerald-200">Привезем продукты до вашей двери за 30 минут.</p>
                     </div>
                     <i class="fa-solid fa-truck-fast text-7xl sm:text-9xl text-white opacity-20"></i>
                 </div>
 
-                <!-- Кнопки переключения слайдера -->
+                <!-- Кнопки слайдера -->
                 <button onclick="prevSlide()" class="absolute left-3 bg-black/30 hover:bg-black/60 text-white p-2 rounded-full text-xs">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
@@ -126,12 +111,22 @@
 
             <!-- Список товаров -->
             <div>
-                <h2 class="text-2xl font-bold mb-4 text-gray-800">Популярные товары</h2>
+                <h2 id="section-title" class="text-2xl font-bold mb-4 text-gray-800">Популярные товары</h2>
                 <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <!-- Карточки загрузятся скриптом -->
+                    <!-- Товары подгружаются скриптом -->
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Модальное окно просмотра товара -->
+    <div id="product-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg p-6 rounded-3xl shadow-2xl relative">
+            <button onclick="closeProductModal()" class="absolute right-4 top-4 text-gray-400 hover:text-black text-2xl font-bold">&times;</button>
+            <div id="modal-product-content" class="text-center">
+                <!-- Контент товара -->
+            </div>
+        </div>
     </div>
 
     <!-- Нижняя подвал-шапка (Footer) -->
@@ -157,8 +152,8 @@
             </div>
             <div>
                 <h4 class="font-bold mb-3 text-lg">Контакты</h4>
-                <p class="text-sm text-emerald-100 mb-2"><i class="fa-solid fa-phone mr-2"></i> +996 (555) 00-00-00</p>
-                <p class="text-sm text-emerald-100"><i class="fa-solid fa-location-dot mr-2"></i> г. Бишкек, Кыргызстан</p>
+                <p class="text-sm text-emerald-100 mb-2"><i class="fa-solid fa-phone mr-2"></i> +7 (999) 206-63-75</p>
+                <p class="text-sm text-emerald-100"><i class="fa-solid fa-location-dot mr-2"></i> г. Санкт-Петербург, Россия</p>
             </div>
         </div>
         <div class="container mx-auto px-4 border-t border-emerald-800/60 pt-4 text-center text-xs text-emerald-200">
@@ -183,7 +178,7 @@
             <div class="border-t pt-4 mt-4 space-y-3">
                 <div class="flex justify-between text-lg font-bold">
                     <span>Итого:</span>
-                    <span id="cart-total" class="text-brand-green">0 сом</span>
+                    <span id="cart-total" class="text-brand-green">0 ₽</span>
                 </div>
                 <button onclick="checkout()" class="w-full brand-green text-white py-3 rounded-xl font-bold hover:bg-emerald-800 transition">
                     Оформить заказ
@@ -194,26 +189,42 @@
 
     <!-- Скрипты управления -->
     <script>
-        // Временные тестовые товары
-        const products = [
-            { id: 1, name: "Кока-Кола 1.5л", price: 95, category: "Напитки", icon: "🥤" },
-            { id: 2, name: "Шоколад Альпен Гольд", price: 85, category: "Сладости", icon: "🍫" },
-            { id: 3, name: "Чипсы Lays Сметана", price: 120, category: "Снеки", icon: "🥔" },
-            { id: 4, name: "Кофе Якобс Монарх 95г", price: 280, category: "Кофе", icon: "☕" },
-            { id: 5, name: "Лапша Доширак Говядина", price: 55, category: "Рамен", icon: "🍜" },
-            { id: 6, name: "Сок Добрый Апельсин 1л", price: 110, category: "Напитки", icon: "🧃" }
+        // Тестовые товары (createdAt хранит время добавления в миллисекундах)
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+
+        let products = [
+            { id: 1, name: "Кока-Кола 1.5л", price: 150, oldPrice: 190, category: "Напитки", icon: "🥤", description: "Освежающий сильногазированный напиток. Объем: 1.5 литра.", createdAt: now - (2 * oneHour) }, // Новинка (2 часа назад)
+            { id: 2, name: "Шоколад Альпен Гольд", price: 95, oldPrice: null, category: "Сладости", icon: "🍫", description: "Молочный шоколад с орехами и изюмом.", createdAt: now - (20 * oneHour) }, // Старый
+            { id: 3, name: "Чипсы Lays Сметана", price: 180, oldPrice: 220, category: "Снеки", icon: "🥔", description: "Картофельные чипсы со вкусом зелени и сметаны.", createdAt: now - (5 * oneHour) }, // Новинка + Скидка
+            { id: 4, name: "Кофе Якобс Монарх 95г", price: 450, oldPrice: null, category: "Кофе", icon: "☕", description: "Растворимый сублимированный кофе богатого вкуса.", createdAt: now - (30 * oneHour) }, // Старый
+            { id: 5, name: "Лапша Доширак Говядина", price: 75, oldPrice: 90, category: "Рамен", icon: "🍜", description: "Быстрозавариваемая лапша с острым говяжьим бульоном.", createdAt: now - (3 * oneHour) }, // Новинка + Скидка
+            { id: 6, name: "Сок Добрый Апельсин 1л", price: 160, oldPrice: null, category: "Напитки", icon: "🧃", description: "100% апельсиновый восстановленный сок.", createdAt: now - (50 * oneHour) } // Старый
         ];
 
         let cart = [];
+        let currentFilter = 'all';
+        let currentCategory = 'all';
 
-        // Отрисовка товаров
-        function renderProducts() {
+        // Отрисовка товаров с учетом фильтров
+        function renderProducts(itemsToRender = products) {
             const grid = document.getElementById('products-grid');
             grid.innerHTML = '';
             
-            products.forEach(p => {
+            if (itemsToRender.length === 0) {
+                grid.innerHTML = '<p class="col-span-full text-center text-gray-400 py-10">Товары не найдены</p>';
+                return;
+            }
+
+            itemsToRender.forEach(p => {
+                let discountBadge = p.oldPrice ? `<span class="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">СКИДКА</span>` : '';
+                let priceHtml = p.oldPrice 
+                    ? `<div class="flex items-center gap-2"><span class="text-brand-green font-extrabold text-base">${p.price} ₽</span><span class="text-gray-400 text-xs line-through">${p.oldPrice} ₽</span></div>`
+                    : `<span class="text-brand-green font-extrabold text-base">${p.price} ₽</span>`;
+
                 grid.innerHTML += `
-                    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                    <div onclick="openProductModal(${p.id})" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition flex flex-col justify-between cursor-pointer relative">
+                        ${discountBadge}
                         <div>
                             <div class="w-full h-28 bg-gray-50 rounded-xl flex items-center justify-center text-4xl mb-3">
                                 ${p.icon}
@@ -222,14 +233,89 @@
                             <h3 class="font-bold text-sm text-gray-800 mt-1 line-clamp-2">${p.name}</h3>
                         </div>
                         <div class="mt-3 pt-2 border-t flex items-center justify-between">
-                            <span class="text-brand-green font-extrabold text-base">${p.price} сом</span>
-                            <button onclick="addToCart(${p.id})" class="brand-green text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-emerald-800 transition">
+                            ${priceHtml}
+                            <button onclick="event.stopPropagation(); addToCart(${p.id})" class="brand-green text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-emerald-800 transition">
                                 <i class="fa-solid fa-plus text-xs"></i>
                             </button>
                         </div>
                     </div>
                 `;
             });
+        }
+
+        // Фильтрация по кнопкам сверху (Новинки 10 часов / Скидки / Все)
+        function filterProducts(type) {
+            currentFilter = type;
+            applyFilters();
+            
+            const titles = {
+                'all': 'Популярные товары',
+                'new': 'Новинки (последние 10 часов)',
+                'discount': 'Товары со скидкой'
+            };
+            document.getElementById('section-title').innerText = titles[type];
+        }
+
+        // Фильтрация по категориям слева
+        function filterByCategory(category) {
+            currentCategory = category;
+            applyFilters();
+        }
+
+        // Общая логика применения фильтров и поиска
+        function applyFilters() {
+            let result = [...products];
+            const tenHours = 10 * 60 * 60 * 1000;
+            const nowTime = Date.now();
+
+            // Фильтр по типу (Новинки / Скидки)
+            if (currentFilter === 'new') {
+                result = result.filter(p => (nowTime - p.createdAt) <= tenHours);
+            } else if (currentFilter === 'discount') {
+                result = result.filter(p => p.oldPrice !== null);
+            }
+
+            // Фильтр по категории
+            if (currentCategory !== 'all') {
+                result = result.filter(p => p.category === currentCategory);
+            }
+
+            renderProducts(result);
+        }
+
+        // Поиск по названию
+        function searchProducts() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            let result = products.filter(p => p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
+            renderProducts(result);
+        }
+
+        // Открытие модального окна товара при клике
+        function openProductModal(id) {
+            const p = products.find(item => item.id === id);
+            if (!p) return;
+
+            let priceHtml = p.oldPrice 
+                ? `<div class="flex items-center justify-center gap-3"><span class="text-2xl font-extrabold text-brand-green">${p.price} ₽</span><span class="text-gray-400 text-lg line-through">${p.oldPrice} ₽</span></div>`
+                : `<span class="text-2xl font-extrabold text-brand-green">${p.price} ₽</span>`;
+
+            document.getElementById('modal-product-content').innerHTML = `
+                <div class="w-32 h-32 bg-gray-50 rounded-2xl mx-auto flex items-center justify-center text-6xl mb-4 shadow-inner">
+                    ${p.icon}
+                </div>
+                <span class="text-xs bg-emerald-100 text-brand-green px-2.5 py-1 rounded-full font-bold uppercase">${p.category}</span>
+                <h3 class="text-2xl font-bold text-gray-800 mt-2">${p.name}</h3>
+                <p class="text-gray-600 text-sm mt-3 mb-6">${p.description}</p>
+                <div class="mb-6">${priceHtml}</div>
+                <button onclick="addToCart(${p.id}); closeProductModal();" class="w-full brand-green text-white py-3 rounded-xl font-bold hover:bg-emerald-800 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-cart-shopping"></i> Добавить в корзину
+                </button>
+            `;
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+
+        function closeProductModal() {
+            document.getElementById('product-modal').classList.add('hidden');
         }
 
         // Логика корзины
@@ -264,7 +350,7 @@
                         <div class="flex justify-between items-center border-b pb-2">
                             <div>
                                 <h4 class="font-bold text-sm">${item.name}</h4>
-                                <p class="text-xs text-gray-500">${item.price} сом x ${item.quantity}</p>
+                                <p class="text-xs text-gray-500">${item.price} ₽ x ${item.quantity}</p>
                             </div>
                             <button onclick="removeFromCart(${item.id})" class="text-red-500 hover:text-red-700 text-xs">
                                 <i class="fa-solid fa-trash"></i>
@@ -275,7 +361,7 @@
             }
 
             cartCount.innerText = totalCount;
-            cartTotal.innerText = totalPrice + ' сом';
+            cartTotal.innerText = totalPrice + ' ₽';
         }
 
         function removeFromCart(id) {
@@ -289,35 +375,31 @@
 
         function checkout() {
             if (cart.length === 0) return alert('Корзина пуста!');
-            alert('Заказ оформлен!');
+            alert('Заказ успешно оформлен! Спасибо за покупку.');
             cart = [];
             updateCart();
             toggleCart();
         }
 
-        // Автопереключение рекламных слайдов
+        // Слайдер рекламы
         let currentSlide = 0;
         const slides = document.querySelectorAll('.banner-slide');
 
-        function showSlide(index) {
-            slides.forEach((slide, i) => {
-                slide.classList.toggle('active', i === index);
-            });
-        }
-
         function nextSlide() {
+            slides[currentSlide].classList.remove('active');
             currentSlide = (currentSlide + 1) % slides.length;
-            showSlide(currentSlide);
+            slides[currentSlide].classList.add('active');
         }
 
         function prevSlide() {
+            slides[currentSlide].classList.remove('active');
             currentSlide = (currentSlide - 1 + slides.length) % slides.length;
-            showSlide(currentSlide);
+            slides[currentSlide].classList.add('active');
         }
 
-        setInterval(nextSlide, 4000); // Автопереключение каждые 4 секунды
+        setInterval(nextSlide, 4000);
 
-        // Старт
+        // Первый запуск
         renderProducts();
     </script>
 </body>
