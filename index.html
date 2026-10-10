@@ -3,66 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Каталог товаров</title>
-    <!-- Подключаем Tailwind CSS для красивого дизайна -->
+    <title>Продуктовый Магазин</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Иконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .brand-green { background-color: #0d6d4a; }
+        .text-brand-green { color: #0d6d4a; }
+        .border-brand-green { border-color: #0d6d4a; }
+        .banner-slide { display: none; }
+        .banner-slide.active { display: flex; }
+    </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans">
+<body class="bg-gray-100 text-gray-800 font-sans flex flex-col min-h-screen">
 
-    <!-- Шапка сайта -->
-    <header class="bg-indigo-600 text-white shadow-md">
-        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold">🛒 Наш Магазин</h1>
-            <button onclick="toggleCart()" class="bg-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-800 transition flex items-center gap-2">
-                <span>Корзина</span>
-                <span id="cart-count" class="bg-white text-indigo-600 px-2 py-0.5 rounded-full text-xs font-bold">0</span>
-            </button>
+    <!-- Верхняя плашка времени работы -->
+    <div class="brand-green text-white text-xs py-2 px-4 flex justify-between items-center shadow-inner">
+        <div class="container mx-auto flex justify-between items-center">
+            <span><i class="fa-regular fa-clock mr-1"></i> Время Доставки: 08:00 - 20:00</span>
+            <div class="hidden md:flex space-x-6 text-xs font-medium">
+                <a href="#" class="hover:underline">Новинки</a>
+                <a href="#" class="hover:underline">Выбор редакции</a>
+                <a href="#" class="hover:underline">Товары со скидкой</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Главная шапка -->
+    <header class="bg-white border-b sticky top-0 z-30 shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <!-- Логотип -->
+            <a href="#" class="flex items-center gap-2 text-2xl font-black text-brand-green tracking-tight">
+                <i class="fa-solid fa-basket-shopping"></i>
+                <span>Продуктовый Магазин</span>
+            </a>
+
+            <!-- Поиск -->
+            <div class="flex-1 max-w-2xl relative hidden sm:block">
+                <input type="text" placeholder="Поиск в Продуктовом Магазине..." class="w-full bg-gray-100 rounded-full py-2 pl-4 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 border border-gray-200">
+                <button class="absolute right-3 top-2.5 text-gray-400 hover:text-brand-green">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </div>
+
+            <!-- Иконки корзины и профиля -->
+            <div class="flex items-center gap-4">
+                <button onclick="toggleCart()" class="relative p-2 text-gray-700 hover:text-brand-green transition">
+                    <i class="fa-solid fa-cart-shopping text-2xl"></i>
+                    <span id="cart-count" class="absolute -top-1 -right-1 brand-green text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">0</span>
+                </button>
+            </div>
         </div>
     </header>
 
-    <!-- Основной контент -->
-    <main class="container mx-auto px-4 py-8">
-        <h2 class="text-3xl font-bold mb-6 text-gray-800">Каталог товаров</h2>
+    <!-- Основной блок с каталогом и контентом -->
+    <div class="container mx-auto px-4 py-6 flex-1 flex flex-col md:flex-row gap-6">
         
-        <!-- Сетка товаров -->
-        <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            <!-- Сюда товары будут подгружаться автоматически -->
-            <p class="text-gray-500">Загрузка товаров...</p>
-        </div>
-    </main>
+        <!-- Боковое меню категорий -->
+        <aside class="w-full md:w-64 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex-shrink-0 h-fit">
+            <h3 class="font-bold text-lg mb-4 text-gray-900 border-b pb-2 flex items-center gap-2">
+                <i class="fa-solid fa-bars text-brand-green"></i> Каталог
+            </h3>
+            <nav class="space-y-1 text-sm font-medium text-gray-700">
+                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
+                    <span>☕ Кофе, чай и какао</span>
+                </a>
+                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
+                    <span>🍬 Сладости и десерты</span>
+                </a>
+                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
+                    <span>🥜 Снеки и орехи</span>
+                </a>
+                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
+                    <span>🥤 Напитки и соки</span>
+                </a>
+                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
+                    <span>🍜 Рамен и лапша</span>
+                </a>
+                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
+                    <span>🧊 Замороженная продукция</span>
+                </a>
+                <a href="#" class="flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 hover:text-brand-green transition">
+                    <span>🥫 Консервы и соусы</span>
+                </a>
+            </nav>
+        </aside>
 
-    <!-- Модальное окно корзины -->
-    <div id="cart-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex justify-end">
-        <div class="bg-white w-full max-w-md h-full p-6 flex flex-col shadow-xl">
+        <!-- Центральная часть -->
+        <main class="flex-1 space-y-6">
+
+            <!-- РЕКЛАМНЫЙ СЛАЙДЕР (Карусель рекламы) -->
+            <div class="relative bg-emerald-900 text-white rounded-2xl overflow-hidden shadow-md h-48 sm:h-64 flex items-center">
+                <!-- Слайд 1 -->
+                <div class="banner-slide active w-full h-full p-6 sm:p-10 flex justify-between items-center bg-gradient-to-r from-emerald-800 to-teal-900">
+                    <div class="space-y-2 max-w-md">
+                        <span class="bg-yellow-400 text-black text-xs font-bold px-2 py-1 rounded">АКЦИЯ НЕДЕЛИ</span>
+                        <h2 class="text-xl sm:text-3xl font-extrabold">Скидки до 30% на все соки и напитки!</h2>
+                        <p class="text-xs sm:text-sm text-emerald-200">Освежись этим летом с лучшей ценой в городе.</p>
+                    </div>
+                    <i class="fa-solid fa-bottle-water text-7xl sm:text-9xl text-white opacity-20"></i>
+                </div>
+
+                <!-- Слайд 2 -->
+                <div class="banner-slide w-full h-full p-6 sm:p-10 flex justify-between items-center bg-gradient-to-r from-green-800 to-emerald-900">
+                    <div class="space-y-2 max-w-md">
+                        <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">БЫСТРАЯ ДОСТАВКА</span>
+                        <h2 class="text-xl sm:text-3xl font-extrabold">Бесплатная доставка от 1000 сом</h2>
+                        <p class="text-xs sm:text-sm text-emerald-200">Привезем продукты до вашей двери за 30 минут.</p>
+                    </div>
+                    <i class="fa-solid fa-truck-fast text-7xl sm:text-9xl text-white opacity-20"></i>
+                </div>
+
+                <!-- Кнопки переключения слайдера -->
+                <button onclick="prevSlide()" class="absolute left-3 bg-black/30 hover:bg-black/60 text-white p-2 rounded-full text-xs">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button onclick="nextSlide()" class="absolute right-3 bg-black/30 hover:bg-black/60 text-white p-2 rounded-full text-xs">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- Список товаров -->
+            <div>
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Популярные товары</h2>
+                <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <!-- Карточки загрузятся скриптом -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Нижняя подвал-шапка (Footer) -->
+    <footer class="brand-green text-white mt-12 pt-10 pb-6 border-t border-emerald-800">
+        <div class="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            <div>
+                <div class="flex items-center gap-2 text-xl font-black mb-3">
+                    <i class="fa-solid fa-basket-shopping"></i>
+                    <span>Продуктовый Магазин</span>
+                </div>
+                <p class="text-emerald-100 text-sm leading-relaxed">
+                    Продуктовый Магазин — Все свежие продукты прямо к вашей двери. Быстрая доставка, высокое качество и лучший выбор каждый день.
+                </p>
+            </div>
+            <div>
+                <h4 class="font-bold mb-3 text-lg">Покупателям</h4>
+                <ul class="space-y-2 text-sm text-emerald-100">
+                    <li><a href="#" class="hover:underline">О нас</a></li>
+                    <li><a href="#" class="hover:underline">Как сделать заказ</a></li>
+                    <li><a href="#" class="hover:underline">Доставка и оплата</a></li>
+                    <li><a href="#" class="hover:underline">Частые вопросы (FAQ)</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-bold mb-3 text-lg">Контакты</h4>
+                <p class="text-sm text-emerald-100 mb-2"><i class="fa-solid fa-phone mr-2"></i> +996 (555) 00-00-00</p>
+                <p class="text-sm text-emerald-100"><i class="fa-solid fa-location-dot mr-2"></i> г. Бишкек, Кыргызстан</p>
+            </div>
+        </div>
+        <div class="container mx-auto px-4 border-t border-emerald-800/60 pt-4 text-center text-xs text-emerald-200">
+            © 2026 Продуктовый Магазин. Все права защищены.
+        </div>
+    </footer>
+
+    <!-- Корзина (Модальное окно) -->
+    <div id="cart-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex justify-end">
+        <div class="bg-white w-full max-w-md h-full p-6 flex flex-col shadow-2xl">
             <div class="flex justify-between items-center mb-4 border-b pb-3">
-                <h3 class="text-xl font-bold">Ваша корзина</h3>
-                <button onclick="toggleCart()" class="text-gray-500 hover:text-black text-xl font-bold">&times;</button>
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-cart-shopping text-brand-green"></i> Ваша корзина
+                </h3>
+                <button onclick="toggleCart()" class="text-gray-400 hover:text-black text-2xl">&times;</button>
             </div>
             
             <div id="cart-items" class="flex-grow overflow-y-auto space-y-3">
                 <p class="text-gray-500 text-center mt-10">Корзина пуста</p>
             </div>
 
-            <div class="border-t pt-4 mt-4">
-                <div class="flex justify-between text-lg font-bold mb-4">
+            <div class="border-t pt-4 mt-4 space-y-3">
+                <div class="flex justify-between text-lg font-bold">
                     <span>Итого:</span>
-                    <span id="cart-total">0 сом</span>
+                    <span id="cart-total" class="text-brand-green">0 сом</span>
                 </div>
-                <button onclick="checkout()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition">
+                <button onclick="checkout()" class="w-full brand-green text-white py-3 rounded-xl font-bold hover:bg-emerald-800 transition">
                     Оформить заказ
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Логика сайта -->
+    <!-- Скрипты управления -->
     <script>
-        // Временные тестовые товары (потом подключим к базе данных)
+        // Временные тестовые товары
         const products = [
-            марафоне = { id: 1, name: "Кока-кола 1л", price: 90, unit: "шт", category: "Напитки" },
-            { id: 2, name: "Хлеб белый", price: 30, unit: "шт", category: "Продукты" },
-            { id: 3, name: "Энергетик Flash", price: 75, unit: "шт", category: "Напитки" },
-            { id: 4, name: "Чипсы Lay's", price: 120, unit: "шт", category: "Снеки" }
+            { id: 1, name: "Кока-Кола 1.5л", price: 95, category: "Напитки", icon: "🥤" },
+            { id: 2, name: "Шоколад Альпен Гольд", price: 85, category: "Сладости", icon: "🍫" },
+            { id: 3, name: "Чипсы Lays Сметана", price: 120, category: "Снеки", icon: "🥔" },
+            { id: 4, name: "Кофе Якобс Монарх 95г", price: 280, category: "Кофе", icon: "☕" },
+            { id: 5, name: "Лапша Доширак Говядина", price: 55, category: "Рамен", icon: "🍜" },
+            { id: 6, name: "Сок Добрый Апельсин 1л", price: 110, category: "Напитки", icon: "🧃" }
         ];
 
         let cart = [];
@@ -74,25 +213,29 @@
             
             products.forEach(p => {
                 grid.innerHTML += `
-                    <div class="bg-white p-4 rounded-xl shadow hover:shadow-lg transition flex flex-col justify-between">
+                    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition flex flex-col justify-between">
                         <div>
-                            <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-medium">${p.category}</span>
-                            <h3 class="text-lg font-bold mt-2">${p.name}</h3>
-                            <p class="text-indigo-600 font-semibold mt-1">${p.price} сом / ${p.unit}</p>
+                            <div class="w-full h-28 bg-gray-50 rounded-xl flex items-center justify-center text-4xl mb-3">
+                                ${p.icon}
+                            </div>
+                            <span class="text-[10px] bg-emerald-100 text-brand-green px-2 py-0.5 rounded font-bold uppercase">${p.category}</span>
+                            <h3 class="font-bold text-sm text-gray-800 mt-1 line-clamp-2">${p.name}</h3>
                         </div>
-                        <button onclick="addToCart(${p.id})" class="mt-4 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
-                            Добавить в корзину
-                        </button>
+                        <div class="mt-3 pt-2 border-t flex items-center justify-between">
+                            <span class="text-brand-green font-extrabold text-base">${p.price} сом</span>
+                            <button onclick="addToCart(${p.id})" class="brand-green text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-emerald-800 transition">
+                                <i class="fa-solid fa-plus text-xs"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
             });
         }
 
-        // Добавление в корзину
+        // Логика корзины
         function addToCart(id) {
             const product = products.find(p => p.id === id);
             const cartItem = cart.find(item => item.id === id);
-            
             if (cartItem) {
                 cartItem.quantity += 1;
             } else {
@@ -101,7 +244,6 @@
             updateCart();
         }
 
-        // Обновление корзины
         function updateCart() {
             const cartCount = document.getElementById('cart-count');
             const cartItems = document.getElementById('cart-items');
@@ -113,7 +255,7 @@
             cartItems.innerHTML = '';
 
             if (cart.length === 0) {
-                cartItems.innerHTML = '<p class="text-gray-500 text-center mt-10">Корзина пуста</p>';
+                cartItems.innerHTML = '<p class="text-gray-400 text-center mt-10">Корзина пуста</p>';
             } else {
                 cart.forEach(item => {
                     totalCount += item.quantity;
@@ -121,10 +263,12 @@
                     cartItems.innerHTML += `
                         <div class="flex justify-between items-center border-b pb-2">
                             <div>
-                                <h4 class="font-semibold">${item.name}</h4>
-                                <p class="text-sm text-gray-500">${item.price} сом x ${item.quantity}</p>
+                                <h4 class="font-bold text-sm">${item.name}</h4>
+                                <p class="text-xs text-gray-500">${item.price} сом x ${item.quantity}</p>
                             </div>
-                            <button onclick="removeFromCart(${item.id})" class="text-red-500 hover:text-red-700 text-sm">Удалить</button>
+                            <button onclick="removeFromCart(${item.id})" class="text-red-500 hover:text-red-700 text-xs">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
                         </div>
                     `;
                 });
@@ -134,31 +278,46 @@
             cartTotal.innerText = totalPrice + ' сом';
         }
 
-        // Удаление из корзины
         function removeFromCart(id) {
             cart = cart.filter(item => item.id !== id);
             updateCart();
         }
 
-        // Открытие/закрытие модального окна корзины
         function toggleCart() {
-            const modal = document.getElementById('cart-modal');
-            modal.classList.toggle('hidden');
+            document.getElementById('cart-modal').classList.toggle('hidden');
         }
 
-        // Оформление заказа
         function checkout() {
-            if (cart.length === 0) {
-                alert('Корзина пуста!');
-                return;
-            }
-            alert('Заказ успешно оформлен! Спасибо за покупку.');
+            if (cart.length === 0) return alert('Корзина пуста!');
+            alert('Заказ оформлен!');
             cart = [];
             updateCart();
             toggleCart();
         }
 
-        // Запуск при загрузке
+        // Автопереключение рекламных слайдов
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.banner-slide');
+
+        function showSlide(index) {
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === index);
+            });
+        }
+
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % slides.length;
+            showSlide(currentSlide);
+        }
+
+        function prevSlide() {
+            currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+            showSlide(currentSlide);
+        }
+
+        setInterval(nextSlide, 4000); // Автопереключение каждые 4 секунды
+
+        // Старт
         renderProducts();
     </script>
 </body>
