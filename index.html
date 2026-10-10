@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Каталог товаров</title>
+    <!-- Подключаем Tailwind CSS для красивого дизайна -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+    <!-- Шапка сайта -->
+    <header class="bg-indigo-600 text-white shadow-md">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold">🛒 Наш Магазин</h1>
+            <button onclick="toggleCart()" class="bg-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-800 transition flex items-center gap-2">
+                <span>Корзина</span>
+                <span id="cart-count" class="bg-white text-indigo-600 px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="container mx-auto px-4 py-8">
+        <h2 class="text-3xl font-bold mb-6 text-gray-800">Каталог товаров</h2>
+        
+        <!-- Сетка товаров -->
+        <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <!-- Сюда товары будут подгружаться автоматически -->
+            <p class="text-gray-500">Загрузка товаров...</p>
+        </div>
+    </main>
+
+    <!-- Модальное окно корзины -->
+    <div id="cart-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex justify-end">
+        <div class="bg-white w-full max-w-md h-full p-6 flex flex-col shadow-xl">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-xl font-bold">Ваша корзина</h3>
+                <button onclick="toggleCart()" class="text-gray-500 hover:text-black text-xl font-bold">&times;</button>
+            </div>
+            
+            <div id="cart-items" class="flex-grow overflow-y-auto space-y-3">
+                <p class="text-gray-500 text-center mt-10">Корзина пуста</p>
+            </div>
+
+            <div class="border-t pt-4 mt-4">
+                <div class="flex justify-between text-lg font-bold mb-4">
+                    <span>Итого:</span>
+                    <span id="cart-total">0 сом</span>
+                </div>
+                <button onclick="checkout()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition">
+                    Оформить заказ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Логика сайта -->
+    <script>
+        // Временные тестовые товары (потом подключим к базе данных)
+        const products = [
+            марафоне = { id: 1, name: "Кока-кола 1л", price: 90, unit: "шт", category: "Напитки" },
+            { id: 2, name: "Хлеб белый", price: 30, unit: "шт", category: "Продукты" },
+            { id: 3, name: "Энергетик Flash", price: 75, unit: "шт", category: "Напитки" },
+            { id: 4, name: "Чипсы Lay's", price: 120, unit: "шт", category: "Снеки" }
+        ];
+
+        let cart = [];
+
+        // Отрисовка товаров
+        function renderProducts() {
+            const grid = document.getElementById('products-grid');
+            grid.innerHTML = '';
+            
+            products.forEach(p => {
+                grid.innerHTML += `
+                    <div class="bg-white p-4 rounded-xl shadow hover:shadow-lg transition flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-medium">${p.category}</span>
+                            <h3 class="text-lg font-bold mt-2">${p.name}</h3>
+                            <p class="text-indigo-600 font-semibold mt-1">${p.price} сом / ${p.unit}</p>
+                        </div>
+                        <button onclick="addToCart(${p.id})" class="mt-4 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                            Добавить в корзину
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        // Добавление в корзину
+        function addToCart(id) {
+            const product = products.find(p => p.id === id);
+            const cartItem = cart.find(item => item.id === id);
+            
+            if (cartItem) {
+                cartItem.quantity += 1;
+            } else {
+                cart.push({ ...product, quantity: 1 });
+            }
+            updateCart();
+        }
+
+        // Обновление корзины
+        function updateCart() {
+            const cartCount = document.getElementById('cart-count');
+            const cartItems = document.getElementById('cart-items');
+            const cartTotal = document.getElementById('cart-total');
+
+            let totalCount = 0;
+            let totalPrice = 0;
+
+            cartItems.innerHTML = '';
+
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p class="text-gray-500 text-center mt-10">Корзина пуста</p>';
+            } else {
+                cart.forEach(item => {
+                    totalCount += item.quantity;
+                    totalPrice += item.price * item.quantity;
+                    cartItems.innerHTML += `
+                        <div class="flex justify-between items-center border-b pb-2">
+                            <div>
+                                <h4 class="font-semibold">${item.name}</h4>
+                                <p class="text-sm text-gray-500">${item.price} сом x ${item.quantity}</p>
+                            </div>
+                            <button onclick="removeFromCart(${item.id})" class="text-red-500 hover:text-red-700 text-sm">Удалить</button>
+                        </div>
+                    `;
+                });
+            }
+
+            cartCount.innerText = totalCount;
+            cartTotal.innerText = totalPrice + ' сом';
+        }
+
+        // Удаление из корзины
+        function removeFromCart(id) {
+            cart = cart.filter(item => item.id !== id);
+            updateCart();
+        }
+
+        // Открытие/закрытие модального окна корзины
+        function toggleCart() {
+            const modal = document.getElementById('cart-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        // Оформление заказа
+        function checkout() {
+            if (cart.length === 0) {
+                alert('Корзина пуста!');
+                return;
+            }
+            alert('Заказ успешно оформлен! Спасибо за покупку.');
+            cart = [];
+            updateCart();
+            toggleCart();
+        }
+
+        // Запуск при загрузке
+        renderProducts();
+    </script>
+</body>
+</html>
