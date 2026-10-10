@@ -10,7 +10,9 @@ import telebot
 from telebot import types
 import requests
 from tavily import TavilyClient
-
+TOKEN = "8963845436:AAEX8346I6DEZGnDKCdqIcXBW6STyGlBxeo"
+SUPABASE_URL = "https://rjkahchakzwiypagqvyr.supabase.co"
+SUPABASE_KEY = "sb_publishable_sCoWnEW2wwYA5R6h8dwgNg_RyrFeFgC"
 # ==========================================
 # 1. МИНИ ВЕБ-СЕРВЕР ДЛЯ RENDER
 # ==========================================
@@ -37,7 +39,7 @@ threading.Thread(target=run_web_server, daemon=True).start()
 # ==========================================
 # 2. ИНИЦИАЛИЗАЦИЯ И ХРАНЕНИЕ ДАННЫХ
 # ==========================================
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_BOT_TOKEN = "8963845436:AAEX8346I6DEZGnDKCdqIcXBW6STyGlBxeo"
 OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
 UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "odaMYOHO8tsFHyGe_Q8-0EZtab_NohgvOYRBEvtIkRE")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "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")
