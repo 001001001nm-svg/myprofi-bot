@@ -37,15 +37,12 @@ threading.Thread(target=run_web_server, daemon=True).start()
 # ==========================================
 # 2. ИНИЦИАЛИЗАЦИЯ И ХРАНЕНИЕ ДАННЫХ
 # ==========================================
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8891087735:AAEv55LG3oQwkEJMN_LBUnEgM-ZMq7qwPf4")
+OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "")
 UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "odaMYOHO8tsFHyGe_Q8-0EZtab_NohgvOYRBEvtIkRE")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "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")
 
 OWNER_ID = 8762115500
-
-if not TELEGRAM_TOKEN:
-    raise ValueError("ОШИБКА: Переменная TELEGRAM_BOT_TOKEN не найдена!")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 tavily_client = TavilyClient(api_key=TAVILY_KEY) if TAVILY_KEY else None
@@ -144,6 +141,9 @@ def clean_ai_response(text):
     return res
 
 def ask_ai(prompt, system_instruction):
+    if not OPENROUTER_KEY:
+        return f"🎓 Обучение и ВУЗы:\nИнформация по вашему запросу обновляется. Пожалуйста, выберите интересующий вас раздел в меню или перевыберите страну."
+
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}",
@@ -176,7 +176,8 @@ def ask_ai(prompt, system_instruction):
                     raw_content = res_data['choices'][0]['message']['content']
                     if raw_content and raw_content.strip():
                         return clean_ai_response(raw_content)
-        except Exception:
+        except Exception as e:
+            print(f"Ошибка ИИ запроса: {e}")
             continue
 
     return "🎓 Пожалуйста, выберите интересующий вас раздел в меню ниже."
@@ -357,11 +358,10 @@ def start(message):
 
     u_data = user_states[user_id]
 
-    # Если профиль запущен ранее, сразу спрашиваем страну
     if u_data.get("name") and u_data.get("age"):
         u_data["state"] = "WAITING_FOR_COUNTRY"
         name = u_data["name"]
-        msg = f"Здравствуйте, {name}! 👋 Рад приветствовать васснова.\nПожалуйста, выберите страну для консультации по обучению:"
+        msg = f"Здравствуйте, {name}! 👋 Рад приветствовать вас снова.\nПожалуйста, выберите страну для консультации по обучению:"
         bot.send_message(message.chat.id, msg, reply_markup=get_country_keyboard())
     else:
         u_data["state"] = "WAITING_FOR_LANG"
@@ -420,7 +420,6 @@ def handle_message(message):
             bot.send_message(message.chat.id, "❌ Участник не найден в базе.", reply_markup=get_owner_panel_keyboard())
         return
 
-    # Шаги знакомства
     if current_state == "WAITING_FOR_LANG" or text in LANGUAGES:
         if text in LANGUAGES:
             user_data["lang"] = text
@@ -450,7 +449,6 @@ def handle_message(message):
             user_data["country"] = text
             user_data["state"] = None
             lang = user_data.get("lang", "🇷🇺 Русский")
-            user_name = user_data.get("name", "Пользователь")
             
             welcome_txt = f"🎓 Выбрана страна: {text}\nНажмите на интересующие вас разделы меню ниже."
             photo = fetch_photo_bytes(f"{text} architecture capital landmark")
@@ -466,9 +464,7 @@ def handle_message(message):
 
     lang = user_data.get("lang", "🇷🇺 Русский")
     c_country = user_data.get("country", "Китай")
-    u_name = user_data.get("name", "Пользователь")
 
-    # Панели Владельца / Админа
     if text == "🛠 Панель Админа" and (user_id == OWNER_ID or user_id in admins):
         bot.send_message(message.chat.id, "🛠 Панель Администратора", reply_markup=get_admin_panel_keyboard())
         return
@@ -555,7 +551,6 @@ def handle_message(message):
         start(message)
         return
 
-    # Генерация ответов с универсальным поиском
     try:
         wait_msg = bot.send_message(message.chat.id, "⏳ Выполняется запрос к базе данных...")
     except Exception:
@@ -578,7 +573,6 @@ def handle_message(message):
         search_query = f"документы для поступления в {c_country} 2026"
         query_photo = f"passport visa application documents"
     else:
-        # Для любых свободных вопросов (например "Кто президент КР")
         prompt_query = text
         search_query = text
         query_photo = f"{text} news photo"
@@ -591,7 +585,7 @@ def handle_message(message):
         f"FRESH WEB DATA:\n{web_data}\n\n"
         f"INSTRUCTIONS:\n"
         f"1. DIRECT ANSWER RULE: Answer the user's specific prompt directly! If the user asks a general or specific question about another topic/country (e.g. 'Who is the president of Kyrgyzstan?'), ANSWER THAT QUESTION DIRECTLY using fresh web data. Do NOT force them back to {c_country} unless their question is explicitly about universities/scholarships.\n"
-        f"2. TONE: Maintain a polite, professional, business-oriented yet accessible tone. Avoid teenager slang (do not use 'йоу', 'вайб', 'база', etc.).\n"
+        f"2. TONE: Maintain a polite, professional, business-oriented yet accessible tone. Avoid teenager slang.\n"
         f"3. EMOJIS: Use emojis tastefully and neatly (🎓, 🏛️, 💰, 📌, ✅) to structure information clearly.\n"
         f"4. SCHOLARSHIPS: Always provide exact scholarship amounts when asked.\n"
         f"5. NO MARKDOWN: Strictly avoid markdown formatting (*, #, _)."
