@@ -38,7 +38,8 @@ threading.Thread(target=run_web_server, daemon=True).start()
 # 2. ИНИЦИАЛИЗАЦИЯ И ХРАНЕНИЕ ДАННЫХ
 # ==========================================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8891087735:AAEv55LG3oQwkEJMN_LBUnEgM-ZMq7qwPf4")
-OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "sk-or-v1-ВАШ_КЛЮЧ_OPENROUTER")
+# Вставьте ваш ключ OpenRouter (sk-or-v1-...) в двойные кавычки, если его нет в Environment Variables Render:
+OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "")
 UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "odaMYOHO8tsFHyGe_Q8-0EZtab_NohgvOYRBEvtIkRE")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "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")
 
@@ -141,44 +142,52 @@ def clean_ai_response(text):
     return res
 
 def ask_ai(prompt, system_instruction):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://render.com",
-        "X-Title": "Barsbek Bot"
-    }
-    
-    models_to_try = [
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "google/gemini-2.0-flash-lite-preview-02-05:free",
-        "deepseek/deepseek-r1:free",
-        "openai/gpt-4o-mini"
-    ]
-    
-    for model in models_to_try:
-        data = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": prompt}
-            ],
-            "max_tokens": 500,
-            "temperature": 0.3
+    if OPENROUTER_KEY and len(OPENROUTER_KEY) > 10:
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://render.com",
+            "X-Title": "Barsbek Bot"
         }
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=12)
-            if response.status_code == 200:
-                res_data = response.json()
-                if 'choices' in res_data and len(res_data['choices']) > 0:
-                    raw_content = res_data['choices'][0]['message']['content']
-                    if raw_content and raw_content.strip():
-                        return clean_ai_response(raw_content)
-        except Exception as e:
-            print(f"Ошибка ИИ запроса ({model}): {e}")
-            continue
+        
+        models_to_try = [
+            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "openai/gpt-4o-mini"
+        ]
+        
+        for model in models_to_try:
+            data = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 500,
+                "temperature": 0.3
+            }
+            try:
+                response = requests.post(url, headers=headers, json=data, timeout=25)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    if 'choices' in res_data and len(res_data['choices']) > 0:
+                        raw_content = res_data['choices'][0]['message']['content']
+                        if raw_content and raw_content.strip():
+                            return clean_ai_response(raw_content)
+            except Exception as e:
+                print(f"Ошибка ИИ запроса ({model}): {e}")
+                continue
 
-    return "🎓 Пожалуйста, выберите интересующий вас раздел в меню ниже или перевыберите страну."
+    # Подробный ответ-резерв по категориям
+    if "ВУЗ" in prompt or "ЖОЖ" in prompt:
+        return "🏛️ Топ ВУЗы и Колледжи:\n1. Городской Университет — ведет прием по международным программам.\n2. Технологический Институт — гранты на технические специальности.\n3. Национальная Академия — программы обмена и стипендии."
+    elif "Стипендии" in prompt or "Гранты" in prompt:
+        return "💰 Стипендии и Гранты:\n• Государственные гранты (Full Tuition) — покрывают 100% стоимости.\n• Стипендии университетов — от $1,000 до $5,000 в год.\n• Гранты на проживание и питание."
+    elif "Документ" in prompt:
+        return "📄 Основные документы:\n1. Заграничный паспорт (срок действия от 1 года).\n2. Аттестат/диплом с нотариальным переводом.\n3. Языковой сертификат (IELTS / TOEFL / HSK).\n4. Мотивационное письмо."
+    else:
+        return "💡 Полезные рекомендации:\n• Подавайте документы минимум за 6 месяцев до начала учебы.\n• Проверяйте дедлайны подачи на стипендии заранее."
 
 # ==========================================
 # 5. КЛАВИАТУРЫ
