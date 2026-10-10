@@ -38,7 +38,7 @@ threading.Thread(target=run_web_server, daemon=True).start()
 # 2. ИНИЦИАЛИЗАЦИЯ И ХРАНЕНИЕ ДАННЫХ
 # ==========================================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8891087735:AAEv55LG3oQwkEJMN_LBUnEgM-ZMq7qwPf4")
-OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "")
+OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "sk-or-v1-ВАШ_КЛЮЧ_OPENROUTER")
 UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "odaMYOHO8tsFHyGe_Q8-0EZtab_NohgvOYRBEvtIkRE")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "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")
 
@@ -141,9 +141,6 @@ def clean_ai_response(text):
     return res
 
 def ask_ai(prompt, system_instruction):
-    if not OPENROUTER_KEY:
-        return f"🎓 Обучение и ВУЗы:\nИнформация по вашему запросу обновляется. Пожалуйста, выберите интересующий вас раздел в меню или перевыберите страну."
-
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}",
@@ -153,9 +150,10 @@ def ask_ai(prompt, system_instruction):
     }
     
     models_to_try = [
-        "google/gemini-2.0-flash-lite-001",
-        "openai/gpt-4o-mini",
-        "google/gemini-2.0-flash-lite-preview-02-05:free"
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "deepseek/deepseek-r1:free",
+        "openai/gpt-4o-mini"
     ]
     
     for model in models_to_try:
@@ -165,7 +163,7 @@ def ask_ai(prompt, system_instruction):
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 400,
+            "max_tokens": 500,
             "temperature": 0.3
         }
         try:
@@ -177,10 +175,10 @@ def ask_ai(prompt, system_instruction):
                     if raw_content and raw_content.strip():
                         return clean_ai_response(raw_content)
         except Exception as e:
-            print(f"Ошибка ИИ запроса: {e}")
+            print(f"Ошибка ИИ запроса ({model}): {e}")
             continue
 
-    return "🎓 Пожалуйста, выберите интересующий вас раздел в меню ниже."
+    return "🎓 Пожалуйста, выберите интересующий вас раздел в меню ниже или перевыберите страну."
 
 # ==========================================
 # 5. КЛАВИАТУРЫ
